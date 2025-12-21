@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Private Temporary Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h2>🔒 Private Temporary Chat</h2>
+
+        <!-- LOGIN -->
+        <div id="login">
+            <input id="email" type="email" placeholder="Email">
+            <input id="password" type="password" placeholder="Password">
+            <button onclick="login()">Login</button>
+        </div>
+
+        <!-- CHAT -->
+        <div id="chat" hidden>
+            <div id="status"></div>
+            <div id="messages"></div>
+
+            <div class="input-row">
+                <input id="msg" placeholder="Type message">
+                <button onclick="send()">Send</button>
+            </div>
+
+            <button class="panic" onclick="panic()">🚨 Safety Button</button>
+        </div>
+
+    </div>
+
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
