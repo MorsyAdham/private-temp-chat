@@ -11,6 +11,13 @@ const ALLOWED_EMAILS = [
     "joboffers540@gmail.com"
 ];
 
+// Map emails to display names
+const USER_NAMES = {
+    "adhammorsy2311@gmail.com": "annoyoumous",
+    "ayaessam487@gmail.com": "Cuitie",
+    "joboffers540@gmail.com": "JobOffers"
+};
+
 let channel;
 let currentUserEmail = "";
 
@@ -49,10 +56,14 @@ function joinChat(email) {
     channel
         .on("broadcast", { event: "message" }, payload => {
             const text = payload.payload?.text ?? "[message]";
-            const sender = payload.payload?.sender ?? "Other";
-            const display = (sender === currentUserEmail) ? `You: ${text}` : `${sender}: ${text}`;
+            const senderEmail = payload.payload?.sender ?? "Other";
+            const senderName = USER_NAMES[senderEmail] || senderEmail;
+
+            // Display "You" if current user, otherwise name of sender
+            const display = (senderEmail === currentUserEmail) ? `You (${senderName}): ${text}` : `${senderName}: ${text}`;
             addMessage(display);
         })
+
         .on("broadcast", { event: "clear" }, () => {
             clearMessages();
         })
@@ -70,9 +81,10 @@ window.send = function () {
     if (!input.value || !channel) return;
 
     const text = input.value;
+    const senderName = USER_NAMES[currentUserEmail] || currentUserEmail;
 
-    // Immediately display for sender
-    addMessage("You: " + text);
+    // Immediately display message locally
+    addMessage(`You (${senderName}): ${text}`);
 
     // Broadcast to everyone
     channel.send({
