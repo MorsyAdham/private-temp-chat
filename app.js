@@ -46,44 +46,70 @@ window.login = async function () {
 
 
 // 💬 JOIN CHAT
-function joinChat(email) {
-    document.getElementById("status").innerText = "Connecting...";
+async function joinChat(email) {
+  document.getElementById("status").innerText = "Connecting...";
 
-    channel = supabaseClient.channel("private-room", {
-        config: { presence: { key: email } }
+  // 1️⃣ Load previous messages from database
+  const { data: messages, error } = await supabaseClient
+    .from("chat_messages")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error loading messages:", error.message);
+  } else if (messages) {
+    messages.forEach(msg => {
+      const senderName = USER_NAMES[msg.sender] || msg.sender;
+      const display = (msg.sender === currentUserEmail)
+        ? `You (${senderName}): ${msg.text}`
+        : `${senderName}: ${msg.text}`;
+      addMessage(display);
     });
+  }
 
-    channel
-        .on("broadcast", { event: "message" }, payload => {
-            const text = payload.payload?.text ?? "[message]";
-            const senderEmail = payload.payload?.sender ?? "Other";
-            const senderName = USER_NAMES[senderEmail] || senderEmail;
+  // 2️⃣ Connect to Realtime channel
+  channel = supabaseClient.channel("private-room", {
+    config: { presence: { key: email } }
+  });
 
-            // Display "You" if current user, otherwise name of sender
-            const display = (senderEmail === currentUserEmail) ? `You (${senderName}): ${text}` : `${senderName}: ${text}`;
-            addMessage(display);
-        })
+  channel
+    .on("broadcast", { event: "message" }, payload => {
+      const text = payload.payload?.text ?? "[message]";
+      const senderEmail = payload.payload?.sender ?? "Other";
+      const senderName = USER_NAMES[senderEmail] || senderEmail;
+      const display = (senderEmail === currentUserEmail)
+        ? `You (${senderName}): ${text}`
+        : `${senderName}: ${text}`;
+      addMessage(display);
+    })
+    .on("broadcast", { event: "clear" }, async () => {
+      clearMessages();
 
-        .on("broadcast", { event: "clear" }, () => {
-            clearMessages();
-        })
-        .subscribe(status => {
-            if (status === "SUBSCRIBED") {
-                document.getElementById("status").innerText = "Connected";
-                console.log("✅ Realtime connected");
-            }
-        });
+      // Delete messages from database
+      await supabaseClient.from("chat_messages").delete().neq("id", 0);
+    })
+    .subscribe(status => {
+      if (status === "SUBSCRIBED") {
+        document.getElementById("status").innerText = "Connected";
+        console.log("✅ Realtime connected");
+      }
+    });
 }
 
 // ✉ SEND MESSAGE
-window.send = function () {
+window.send = async function () {
     const input = document.getElementById("msg");
     if (!input.value || !channel) return;
 
     const text = input.value;
     const senderName = USER_NAMES[currentUserEmail] || currentUserEmail;
 
-    // Immediately display message locally
+    // Store in database
+    await supabaseClient
+        .from("chat_messages")
+        .insert([{ sender: currentUserEmail, text }]);
+
+    // Immediately display locally
     addMessage(`You (${senderName}): ${text}`);
 
     // Broadcast to everyone
@@ -97,15 +123,18 @@ window.send = function () {
 };
 
 // 🚨 PANIC BUTTON
-window.panic = function () {
+window.panic = async function () {
     if (!channel) return;
-    // if (!confirm("Erase all messages?")) return;
+    //   if (!confirm("Erase all messages?")) return;
 
     // Broadcast clear event to everyone
     channel.send({ type: "broadcast", event: "clear", payload: {} });
 
     // Clear local messages immediately
     clearMessages();
+
+    // Delete messages from Supabase
+    await supabaseClient.from("chat_messages").delete().neq("id", 0);
 };
 
 // 🧹 ADD MESSAGE TO CHAT BOX
@@ -123,8 +152,8 @@ function clearMessages() {
 }
 
 // ❌ AUTO-CLEAR WHEN USER LEAVES
-window.addEventListener("beforeunload", () => {
-    if (channel) {
-        channel.send({ type: "broadcast", event: "clear", payload: {} });
-    }
-});
+// window.addEventListener("beforeunload", () => {
+//     if (channel) {
+//         channel.send({ type: "broadcast", event: "clear", payload: {} });
+//     }
+// });
