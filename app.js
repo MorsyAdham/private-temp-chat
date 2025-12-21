@@ -138,7 +138,7 @@ window.send = async function () {
         .insert([{ sender: currentUserEmail, text }]);
 
     // Immediately display locally
-    addMessage(`You (${senderName}): ${text}`);
+    addMessage(`You: ${text}`);
 
     // Broadcast to everyone
     channel.send({
