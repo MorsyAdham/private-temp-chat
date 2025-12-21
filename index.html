@@ -3,39 +3,43 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Private Temporary Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Private Chat Room</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
 
-    <div class="container">
+    <!-- WRAPPER -->
+    <div class="wrapper">
 
-        <h2>🔒 Private Temporary Chat</h2>
-
-        <!-- LOGIN -->
-        <div id="login">
-            <input id="email" type="email" placeholder="Email">
-            <input id="password" type="password" placeholder="Password">
+        <!-- LOGIN SCREEN (VISIBLE BY DEFAULT) -->
+        <div id="login" class="container">
+            <h2>Login to Chat</h2>
+            <input type="email" id="email" placeholder="Email">
+            <input type="password" id="password" placeholder="Password">
             <button onclick="login()">Login</button>
         </div>
 
-        <!-- CHAT -->
-        <div id="chat" hidden>
-            <div id="status"></div>
-            <div id="messages"></div>
-
-            <div class="input-row">
-                <input id="msg" placeholder="Type message">
+        <!-- CHAT SCREEN (HIDDEN BY DEFAULT) -->
+        <div id="chat" class="container" style="display: none;">
+            <div class="header">
+                <h2>Private Chat Room</h2>
+                <span id="status">Connecting...</span>
+                <button class="panic-btn" onclick="panic()">Panic</button>
             </div>
+            <div id="messages" class="messages"></div>
+            <div class="input-area">
+                <input type="text" id="msg" placeholder="Type your message..."
+                    onkeypress="if(event.key==='Enter') send()">
                 <button onclick="send()">Send</button>
-
-            <button class="panic" onclick="panic()">🚨 Safety Button</button>
+            </div>
         </div>
 
     </div>
 
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
 </body>
 

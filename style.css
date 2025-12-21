@@ -1,78 +1,143 @@
-body {
+/* Reset & basic */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
   font-family: Arial, sans-serif;
-  background: #0f172a;
-  color: #e5e7eb;
+}
+
+body {
+  background: #0a0a1a;
+  color: #fff;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  min-height: 100vh;
 }
 
+/* Wrapper centers content */
+.wrapper {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Container for login/chat */
 .container {
-  width: 350px;
-  background: #020617;
-  padding: 20px;
+  width: 100%;
+  background: #1e293b;
   border-radius: 10px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
+/* Headers */
 h2 {
+  font-size: 1.4rem;
+  margin-bottom: 10px;
   text-align: center;
 }
 
-input {
+/* Inputs */
+input[type="email"], input[type="password"], input[type="text"] {
   width: 100%;
-  padding: 8px;
-  margin: 5px 0;
-  border-radius: 5px;
+  padding: 10px;
+  border-radius: 6px;
   border: none;
+  outline: none;
+  font-size: 1rem;
 }
 
+/* Buttons */
 button {
-  width: 100%;
-  padding: 8px;
-  margin-top: 5px;
+  padding: 10px;
+  border-radius: 6px;
   border: none;
-  border-radius: 5px;
-  background: #2563eb;
-  color: white;
   cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
 }
 
 button:hover {
   opacity: 0.9;
 }
 
-#messages {
-  background: #020617;
-  border: 1px solid #1e293b;
-  height: 200px;
-  overflow-y: auto;
+button:active {
+  transform: scale(0.98);
+}
+
+/* Panic button */
+.panic-btn {
+  background: #e11d48;
+  color: #fff;
+  padding: 5px 10px;
+  font-size: 0.9rem;
+  margin-left: auto;
+}
+
+/* Messages box */
+.messages {
+  flex: 1;
+  background: #0f172a;
+  border-radius: 8px;
   padding: 10px;
-  margin-bottom: 10px;
-  color: aliceblue;
+  overflow-y: auto;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
-#messages p {
-  margin: 5px 0;
-}
-
-.input-row {
+/* Input area */
+.input-area {
   display: flex;
   gap: 5px;
 }
 
-.input-row input {
+.input-area input {
   flex: 1;
 }
 
-.panic {
-  background: #dc2626;
-  margin-top: 10px;
+.input-area button {
+  background: #3b82f6;
+  color: #fff;
 }
 
-#status {
-  text-align: center;
-  font-size: 12px;
-  margin-bottom: 5px;
-  color: #94a3b8;
+/* Scrollbar style */
+.messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messages::-webkit-scrollbar-thumb {
+  background-color: #3b82f6;
+  border-radius: 3px;
+}
+
+/* Header layout */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  .container {
+    max-width: 95%;
+    padding: 10px;
+  }
+
+  h2 {
+    font-size: 1.2rem;
+  }
+
+  .panic-btn {
+    padding: 5px 8px;
+    font-size: 0.8rem;
+  }
 }
