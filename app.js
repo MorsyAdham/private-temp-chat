@@ -13,8 +13,8 @@ const ALLOWED_EMAILS = [
 
 // Map emails to display names
 const USER_NAMES = {
-    "adhammorsy2311@gmail.com": "annoyoumous",
-    "ayaessam487@gmail.com": "Cuitie",
+    "adhammorsy2311@gmail.com": "Nobody",
+    "ayaessam487@gmail.com": "My Love",
     "joboffers540@gmail.com": "JobOffers"
 };
 
@@ -81,12 +81,12 @@ async function joinChat(email) {
         console.error("Error loading messages:", error.message);
     } else if (messages) {
         messages.forEach(msg => {
-            const senderName = USER_NAMES[msg.sender] || msg.sender;
             const display = (msg.sender === currentUserEmail)
-                ? `You (${senderName}): ${msg.text}`
-                : `${senderName}: ${msg.text}`;
+                ? `You: ${msg.text}`   // remove the parentheses with the name
+                : `${USER_NAMES[msg.sender] || msg.sender}: ${msg.text}`;
             addMessage(display);
         });
+
     }
 
     // 2️⃣ Connect to Realtime channel
@@ -94,21 +94,22 @@ async function joinChat(email) {
         config: { presence: { key: email } }
     });
 
-    channel
-        .on("broadcast", { event: "message" }, payload => {
-            const text = payload.payload?.text ?? "[message]";
-            const senderEmail = payload.payload?.sender ?? "Other";
-            const senderName = USER_NAMES[senderEmail] || senderEmail;
-            const display = (senderEmail === currentUserEmail)
-                ? `You (${senderName}): ${text}`
-                : `${senderName}: ${text}`;
-            addMessage(display);
+    channel.on("broadcast", { event: "message" }, payload => {
+        const text = payload.payload?.text ?? "[message]";
+        const senderEmail = payload.payload?.sender ?? "Other";
 
-            // Only notify if the message is from someone else
-            if (senderEmail !== currentUserEmail) {
-                notifyUser(senderName, text);
-            }
-        })
+        const display = (senderEmail === currentUserEmail)
+            ? `You: ${text}`  // <-- removed name in parentheses
+            : `${USER_NAMES[senderEmail] || senderEmail}: ${text}`;
+
+        addMessage(display);
+
+        // Notifications for messages from others
+        if (senderEmail !== currentUserEmail) {
+            notifyUser(USER_NAMES[senderEmail] || senderEmail, text);
+        }
+    })
+
         .on("broadcast", { event: "clear" }, async () => {
             clearMessages();
 
