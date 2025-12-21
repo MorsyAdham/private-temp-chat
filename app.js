@@ -41,59 +41,86 @@ window.login = async function () {
     document.getElementById("login").style.display = "none";
     document.getElementById("chat").style.display = "flex";
 
+    // 🔔 Request notification permission here
+    if (Notification.permission !== "granted") {
+        Notification.requestPermission().then(permission => {
+            console.log("Notification permission:", permission);
+        });
+    }
+
     joinChat(currentUserEmail);
 };
 
+// Ask the user for permission to send notifications
+if (Notification.permission !== "granted") {
+    Notification.requestPermission().then(permission => {
+        console.log("Notification permission:", permission);
+    });
+}
+
+function notifyUser(title, message) {
+    if (Notification.permission === "granted") {
+        new Notification(title, {
+            body: message,
+            icon: "https://cdn-icons-png.flaticon.com/512/2462/2462719.png" // optional icon
+        });
+    }
+}
 
 // 💬 JOIN CHAT
 async function joinChat(email) {
-  document.getElementById("status").innerText = "Connecting...";
+    document.getElementById("status").innerText = "Connecting...";
 
-  // 1️⃣ Load previous messages from database
-  const { data: messages, error } = await supabaseClient
-    .from("chat_messages")
-    .select("*")
-    .order("created_at", { ascending: true });
+    // 1️⃣ Load previous messages from database
+    const { data: messages, error } = await supabaseClient
+        .from("chat_messages")
+        .select("*")
+        .order("created_at", { ascending: true });
 
-  if (error) {
-    console.error("Error loading messages:", error.message);
-  } else if (messages) {
-    messages.forEach(msg => {
-      const senderName = USER_NAMES[msg.sender] || msg.sender;
-      const display = (msg.sender === currentUserEmail)
-        ? `You (${senderName}): ${msg.text}`
-        : `${senderName}: ${msg.text}`;
-      addMessage(display);
+    if (error) {
+        console.error("Error loading messages:", error.message);
+    } else if (messages) {
+        messages.forEach(msg => {
+            const senderName = USER_NAMES[msg.sender] || msg.sender;
+            const display = (msg.sender === currentUserEmail)
+                ? `You (${senderName}): ${msg.text}`
+                : `${senderName}: ${msg.text}`;
+            addMessage(display);
+        });
+    }
+
+    // 2️⃣ Connect to Realtime channel
+    channel = supabaseClient.channel("private-room", {
+        config: { presence: { key: email } }
     });
-  }
 
-  // 2️⃣ Connect to Realtime channel
-  channel = supabaseClient.channel("private-room", {
-    config: { presence: { key: email } }
-  });
+    channel
+        .on("broadcast", { event: "message" }, payload => {
+            const text = payload.payload?.text ?? "[message]";
+            const senderEmail = payload.payload?.sender ?? "Other";
+            const senderName = USER_NAMES[senderEmail] || senderEmail;
+            const display = (senderEmail === currentUserEmail)
+                ? `You (${senderName}): ${text}`
+                : `${senderName}: ${text}`;
+            addMessage(display);
 
-  channel
-    .on("broadcast", { event: "message" }, payload => {
-      const text = payload.payload?.text ?? "[message]";
-      const senderEmail = payload.payload?.sender ?? "Other";
-      const senderName = USER_NAMES[senderEmail] || senderEmail;
-      const display = (senderEmail === currentUserEmail)
-        ? `You (${senderName}): ${text}`
-        : `${senderName}: ${text}`;
-      addMessage(display);
-    })
-    .on("broadcast", { event: "clear" }, async () => {
-      clearMessages();
+            // Only notify if the message is from someone else
+            if (senderEmail !== currentUserEmail) {
+                notifyUser(senderName, text);
+            }
+        })
+        .on("broadcast", { event: "clear" }, async () => {
+            clearMessages();
 
-      // Delete messages from database
-      await supabaseClient.from("chat_messages").delete().neq("id", 0);
-    })
-    .subscribe(status => {
-      if (status === "SUBSCRIBED") {
-        document.getElementById("status").innerText = "Connected";
-        console.log("✅ Realtime connected");
-      }
-    });
+            // Delete messages from database
+            await supabaseClient.from("chat_messages").delete().neq("id", 0);
+        })
+        .subscribe(status => {
+            if (status === "SUBSCRIBED") {
+                document.getElementById("status").innerText = "Connected";
+                console.log("✅ Realtime connected");
+            }
+        });
 }
 
 // ✉ SEND MESSAGE
