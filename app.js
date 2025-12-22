@@ -49,14 +49,13 @@ window.login = async function () {
     }
 
     joinChat(currentUserEmail);
-};
 
-// Ask the user for permission to send notifications
-if (Notification.permission !== "granted") {
-    Notification.requestPermission().then(permission => {
-        console.log("Notification permission:", permission);
-    });
-}
+    sendAdminEmail(
+        "User Login",
+        currentUserEmail,
+        "User logged into the chat"
+    );
+};
 
 function notifyUser(title, message) {
     if (Notification.permission === "granted") {
@@ -147,8 +146,31 @@ window.send = async function () {
         payload: { text, sender: currentUserEmail }
     });
 
+    sendAdminEmail(
+        "New Message",
+        currentUserEmail,
+        messageText
+    );
+
     input.value = "";
 };
+
+function sendAdminEmail(eventType, userEmail, messageText) {
+    emailjs.send(
+        "service_8p7t2ae",
+        "template_pw67vum",
+        {
+            to_email: "adhammorsy2311@gmail.com", // ✅ FIX
+            event: eventType || "Unknown Event",
+            user: USER_NAMES[userEmail] || userEmail,
+            message: messageText || "—",
+            time: new Date().toLocaleString()
+        }
+    ).then(
+        () => console.log("📧 Admin email sent"),
+        (error) => console.error("❌ EmailJS error:", error)
+    );
+}
 
 // 🚨 PANIC BUTTON
 window.panic = async function () {
