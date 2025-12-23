@@ -113,7 +113,7 @@ async function joinChat(email) {
             clearMessages();
 
             // Delete messages from database
-            await supabaseClient.from("chat_messages").delete().neq("id", 0);
+            // await supabaseClient.from("chat_messages").delete().neq("id", 0);
         })
         .subscribe(status => {
             if (status === "SUBSCRIBED") {
@@ -149,7 +149,7 @@ window.send = async function () {
     sendAdminEmail(
         "New Message",
         currentUserEmail,
-        messageText
+        text
     );
 
     input.value = "";
@@ -173,19 +173,35 @@ function sendAdminEmail(eventType, userEmail, messageText) {
 }
 
 // 🚨 PANIC BUTTON
+// window.panic = async function () {
+//     if (!channel) return;
+//     if (!confirm("Erase all messages?")) return;
+
+//     // Broadcast clear event to everyone
+//     channel.send({ type: "broadcast", event: "clear", payload: {} });
+
+//     // Clear local messages immediately
+//     clearMessages();
+
+//     // Delete messages from Supabase
+//     await supabaseClient.from("chat_messages").delete().neq("id", 0);
+// };
+
 window.panic = async function () {
     if (!channel) return;
-    //   if (!confirm("Erase all messages?")) return;
+    if (!confirm("Hide all messages for everyone?")) return;
 
     // Broadcast clear event to everyone
-    channel.send({ type: "broadcast", event: "clear", payload: {} });
+    channel.send({
+        type: "broadcast",
+        event: "clear",
+        payload: {}
+    });
 
-    // Clear local messages immediately
+    // Clear local UI only
     clearMessages();
-
-    // Delete messages from Supabase
-    await supabaseClient.from("chat_messages").delete().neq("id", 0);
 };
+
 
 // 🧹 ADD MESSAGE TO CHAT BOX
 function addMessage(text) {
@@ -201,9 +217,3 @@ function clearMessages() {
     document.getElementById("messages").innerHTML = "";
 }
 
-// ❌ AUTO-CLEAR WHEN USER LEAVES
-// window.addEventListener("beforeunload", () => {
-//     if (channel) {
-//         channel.send({ type: "broadcast", event: "clear", payload: {} });
-//     }
-// });
