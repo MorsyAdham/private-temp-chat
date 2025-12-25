@@ -164,7 +164,7 @@ function sendAdminEmail(eventType, userEmail, messageText) {
         "service_t7fpys1",
         "template_7bp728k",
         {
-            to_email: "adham2003habiba2005@gmail.com",
+            to_email: "adhammorsy2311@gmail.com",
             event: eventType || "Unknown Event",
             user: USER_NAMES[userEmail] || userEmail,
             message: messageText || "—",
@@ -220,4 +220,5 @@ function addMessage(text) {
 function clearMessages() {
     document.getElementById("messages").innerHTML = "";
 }
+
 
