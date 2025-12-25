@@ -50,11 +50,13 @@ window.login = async function () {
 
     joinChat(currentUserEmail);
 
-    sendAdminEmail(
-        "User Login",
-        currentUserEmail,
-        "User logged into the chat"
-    );
+    if (currentUserEmail !== "adhammorsy2311@gmail.com") {
+        sendAdminEmail(
+            "User Login",
+            currentUserEmail,
+            "User logged into the chat"
+        );
+    }
 };
 
 function notifyUser(title, message) {
@@ -146,21 +148,23 @@ window.send = async function () {
         payload: { text, sender: currentUserEmail }
     });
 
-    sendAdminEmail(
-        "New Message",
-        currentUserEmail,
-        text
-    );
+    if (currentUserEmail !== "adhammorsy2311@gmail.com") {
+        sendAdminEmail(
+            "New Message",
+            currentUserEmail,
+            text
+        );
+    }
 
     input.value = "";
 };
 
 function sendAdminEmail(eventType, userEmail, messageText) {
     emailjs.send(
-        "service_8p7t2ae",
-        "template_pw67vum",
+        "service_t7fpys1",
+        "template_7bp728k",
         {
-            to_email: "adhammorsy2311@gmail.com", // ✅ FIX
+            to_email: "adham2003habiba2005@gmail.com",
             event: eventType || "Unknown Event",
             user: USER_NAMES[userEmail] || userEmail,
             message: messageText || "—",
