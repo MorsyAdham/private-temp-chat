@@ -2,7 +2,10 @@
 const SUPABASE_URL = "https://twvwusthqhxnmghcnbjk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3dnd1c3RocWh4bm1naGNuYmprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMzUwMTAsImV4cCI6MjA4MTkxMTAxMH0.zPw0OH5TaWCM_SLGQYpUAp00mVZwamR13KPDs_HRb7s";
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+);
 
 // 👤 ADMIN APPROVAL
 const ALLOWED_EMAILS = [
@@ -18,15 +21,19 @@ const USER_NAMES = {
     "joboffers540@gmail.com": "JobOffers"
 };
 
-let channel;
-let currentUserEmail = "";
+let PAGE_SIZE = 1000;
+// let oldestLoadedAt = null;
 
-// LOGIN FUNCTION
+/* =========================
+   LOGIN
+========================= */
 window.login = async function () {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    const { data, error } =
+        await supabaseClient.auth.signInWithPassword({ email, password });
+
     if (error) return alert(error.message);
 
     if (!ALLOWED_EMAILS.includes(data.user.email)) {
@@ -37,188 +44,251 @@ window.login = async function () {
 
     currentUserEmail = data.user.email;
 
-    // ✅ Hide login, show chat
+    if (currentUserEmail === "ayaessam487@gmail.com") {
+        sendTelegramNotification("Aya just logged in!");
+    }
+
     document.getElementById("login").style.display = "none";
     document.getElementById("chat").style.display = "flex";
 
-    // 🔔 Request notification permission here
+    // Notifications
     if (Notification.permission !== "granted") {
-        Notification.requestPermission().then(permission => {
-            console.log("Notification permission:", permission);
-        });
+        await Notification.requestPermission();
     }
 
-    joinChat(currentUserEmail);
-
-    if (currentUserEmail !== "adhammorsy2311@gmail.com") {
-        sendAdminEmail(
-            "User Login",
-            currentUserEmail,
-            "User logged into the chat"
-        );
-    }
-};
-
-function notifyUser(title, message) {
-    if (Notification.permission === "granted") {
-        new Notification(title, {
-            body: message,
-            icon: "https://cdn-icons-png.flaticon.com/512/2462/2462719.png" // optional icon
-        });
-    }
-}
-
-// 💬 JOIN CHAT
-async function joinChat(email) {
-    document.getElementById("status").innerText = "Connecting...";
-
-    // 1️⃣ Load previous messages from database
-    const { data: messages, error } = await supabaseClient
-        .from("chat_messages")
-        .select("*")
-        .order("created_at", { ascending: true });
-
-    if (error) {
-        console.error("Error loading messages:", error.message);
-    } else if (messages) {
-        messages.forEach(msg => {
-            const display = (msg.sender === currentUserEmail)
-                ? `You: ${msg.text}`   // remove the parentheses with the name
-                : `${USER_NAMES[msg.sender] || msg.sender}: ${msg.text}`;
-            addMessage(display);
-        });
-
-    }
-
-    // 2️⃣ Connect to Realtime channel
-    channel = supabaseClient.channel("private-room", {
-        config: { presence: { key: email } }
+    // Presence online
+    await supabaseClient.from("presence").upsert({
+        email: currentUserEmail,
+        online: true,
+        last_seen: new Date()
     });
 
-    channel.on("broadcast", { event: "message" }, payload => {
-        const text = payload.payload?.text ?? "[message]";
-        const senderEmail = payload.payload?.sender ?? "Other";
+    joinChat(currentUserEmail);
+};
 
-        const display = (senderEmail === currentUserEmail)
-            ? `You: ${text}`  // <-- removed name in parentheses
-            : `${USER_NAMES[senderEmail] || senderEmail}: ${text}`;
+let channel;
+let currentUserEmail = "";
+let partnerEmail = "";
 
-        addMessage(display);
+/* =========================
+   JOIN CHAT
+========================= */
+async function loadAllMessages() {
+    const PAGE_SIZE = 500; // fetch in chunks
+    let allMessages = [];
+    let lastTimestamp = null;
 
-        // Notifications for messages from others
-        if (senderEmail !== currentUserEmail) {
-            notifyUser(USER_NAMES[senderEmail] || senderEmail, text);
+    while (true) {
+        let query = supabaseClient
+            .from("chat_messages")
+            .select("*")
+            .order("created_at", { ascending: true })
+            .limit(PAGE_SIZE);
+
+        if (lastTimestamp) {
+            query = query.gt("created_at", lastTimestamp); // get newer messages
         }
-    })
 
-        .on("broadcast", { event: "clear" }, async () => {
-            clearMessages();
+        const { data, error } = await query;
 
-            // Delete messages from database
-            // await supabaseClient.from("chat_messages").delete().neq("id", 0);
-        })
-        .subscribe(status => {
-            if (status === "SUBSCRIBED") {
-                document.getElementById("status").innerText = "Connected";
-                console.log("✅ Realtime connected");
-            }
+        if (error) {
+            console.error(error);
+            break;
+        }
+
+        if (!data || data.length === 0) break;
+
+        allMessages.push(...data);
+        lastTimestamp = data[data.length - 1].created_at;
+
+        if (data.length < PAGE_SIZE) break; // last batch
+    }
+
+    // Render messages
+    allMessages.forEach(msg => {
+        addMessage({
+            text: msg.text,
+            isSender: msg.sender === currentUserEmail,
+            senderName: USER_NAMES[msg.sender],
+            createdAt: msg.created_at,
+            read: msg.read
         });
+    });
 }
 
-// ✉ SEND MESSAGE
+async function joinChat(email) {
+    currentUserEmail = email;
+    partnerEmail = ALLOWED_EMAILS.find(e => e !== currentUserEmail);
+
+    updateConnectionStatus("Connecting...");
+
+    // 1️⃣ Load all messages
+    await loadAllMessages();
+
+    // 2️⃣ Realtime chat channel
+    channel = supabaseClient.channel("private-room");
+
+    channel.on("broadcast", { event: "message" }, async payload => {
+        const { id, text, sender, created_at } = payload.payload;
+
+        addMessage({
+            text,
+            isSender: sender === currentUserEmail,
+            senderName: USER_NAMES[sender],
+            createdAt: created_at,
+            read: false,
+            id
+        });
+
+        if (sender !== currentUserEmail) {
+            await supabaseClient
+                .from("chat_messages")
+                .update({ read: true })
+                .eq("id", id);
+
+            notifyUser(USER_NAMES[sender] || sender, text);
+        }
+    });
+
+    channel.subscribe(status => {
+        if (status === "SUBSCRIBED") {
+            updateConnectionStatus("🟢 Connected");
+            console.log("✅ Realtime connected");
+        } else {
+            updateConnectionStatus("🔴 Disconnected");
+        }
+    });
+}
+
+/* =========================
+   SEND MESSAGE
+========================= */
 window.send = async function () {
     const input = document.getElementById("msg");
     if (!input.value || !channel) return;
 
     const text = input.value;
-    const senderName = USER_NAMES[currentUserEmail] || currentUserEmail;
 
-    // Store in database
-    await supabaseClient
+    // Insert + get row
+    const { data: inserted, error } = await supabaseClient
         .from("chat_messages")
-        .insert([{ sender: currentUserEmail, text }]);
+        .insert([{ sender: currentUserEmail, text }])
+        .select()
+        .single();
 
-    // Immediately display locally
-    addMessage(`You: ${text}`);
+    if (error) return console.error(error);
 
-    // Broadcast to everyone
+    // Local display
+    addMessage({
+        text,
+        isSender: true,
+        createdAt: inserted.created_at,
+        read: false
+    });
+
+    // Broadcast
     channel.send({
         type: "broadcast",
         event: "message",
-        payload: { text, sender: currentUserEmail }
+        payload: {
+            id: inserted.id,
+            text,
+            sender: currentUserEmail,
+            created_at: inserted.created_at
+        }
     });
-
-    if (currentUserEmail !== "adhammorsy2311@gmail.com") {
-        sendAdminEmail(
-            "New Message",
-            currentUserEmail,
-            text
-        );
-    }
 
     input.value = "";
 };
 
-function sendAdminEmail(eventType, userEmail, messageText) {
-    emailjs.send(
-        "service_t7fpys1",
-        "template_7bp728k",
-        {
-            to_email: "adhammorsy2311@gmail.com",
-            event: eventType || "Unknown Event",
-            user: USER_NAMES[userEmail] || userEmail,
-            message: messageText || "—",
-            time: new Date().toLocaleString()
-        }
-    ).then(
-        () => console.log("📧 Admin email sent"),
-        (error) => console.error("❌ EmailJS error:", error)
-    );
+/* =========================
+   UI HELPERS
+========================= */
+function notifyUser(title, message) {
+    if (Notification.permission === "granted") {
+        new Notification(title, { body: message });
+    }
 }
 
-// 🚨 PANIC BUTTON
-// window.panic = async function () {
-//     if (!channel) return;
-//     if (!confirm("Erase all messages?")) return;
-
-//     // Broadcast clear event to everyone
-//     channel.send({ type: "broadcast", event: "clear", payload: {} });
-
-//     // Clear local messages immediately
-//     clearMessages();
-
-//     // Delete messages from Supabase
-//     await supabaseClient.from("chat_messages").delete().neq("id", 0);
-// };
-
-window.panic = async function () {
-    if (!channel) return;
-    if (!confirm("Hide all messages for everyone?")) return;
-
-    // Broadcast clear event to everyone
-    channel.send({
-        type: "broadcast",
-        event: "clear",
-        payload: {}
+function formatTime(ts) {
+    return new Date(ts).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
     });
-
-    // Clear local UI only
-    clearMessages();
-};
-
-
-// 🧹 ADD MESSAGE TO CHAT BOX
-function addMessage(text) {
-    const messagesDiv = document.getElementById("messages");
-    const p = document.createElement("p");
-    p.textContent = text;
-    messagesDiv.appendChild(p);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// 🧹 CLEAR MESSAGES
+async function addMessage({ text, isSender, senderName, createdAt, read, id }) {
+    const messagesDiv = document.getElementById("messages");
+
+    const bubble = document.createElement("div");
+    bubble.className = `message-bubble ${isSender ? "sender" : "receiver"}`;
+    bubble.style.alignSelf = isSender ? "flex-end" : "flex-start";
+
+    if (!isSender && senderName) {
+        const name = document.createElement("div");
+        name.className = "sender-name";
+        name.textContent = senderName;
+        bubble.appendChild(name);
+    }
+
+    const content = document.createElement("div");
+    content.className = "message-text";
+    content.textContent = text;
+
+    const meta = document.createElement("div");
+    meta.className = "message-meta";
+    meta.textContent = createdAt ? formatTime(createdAt) : "";
+
+    if (isSender) {
+        const receipt = document.createElement("span");
+        receipt.textContent = read ? " ✓✓" : " ✓";
+        receipt.className = read ? "read" : "sent";
+        meta.appendChild(receipt);
+    }
+
+    bubble.append(content, meta);
+    messagesDiv.appendChild(bubble);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+    // ✅ Mark as read if message is from the other user and not already read
+    if (!isSender && !read && id) {
+        await supabaseClient
+            .from("chat_messages")
+            .update({ read: true })
+            .eq("id", id);
+    }
+}
+
 function clearMessages() {
     document.getElementById("messages").innerHTML = "";
 }
 
+/* =========================
+   UPDATE STATUS UI
+========================= */
+function updateConnectionStatus(text) {
+    document.getElementById("connection-status").textContent = text;
+}
 
+// Panic button: clear all messages after confirmation
+document.getElementById("panic-btn").addEventListener("click", () => {
+    const confirmPanic = confirm("Are you sure you want to hide all messages?");
+    if (confirmPanic) {
+        clearMessages(); // this is your existing function
+    }
+});
+
+
+async function sendTelegramNotification(message) {
+    const chatId = "5637769598";       // Replace with your chat ID
+    const botToken = "8551799267:AAF3DHlffeUhTCWYV5J5c0AoYRbDmfNkodo";   // Replace with your bot token
+
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            chat_id: chatId,
+            text: message
+        })
+    });
+}

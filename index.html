@@ -27,10 +27,19 @@
         <div id="chat" class="container" style="display: none;">
             <div class="header">
                 <h2>Our Room</h2>
-                <span id="status">Connecting...</span>
-                <button class="panic-btn" onclick="panic()">Panic</button>
+                <button id="panic-btn" class="panic-btn" onclick="panic()">Panic</button>
             </div>
-            <div id="messages" class="messages"></div>
+            <div id="connection-status">🔴 Disconnected</div>
+            <!-- <div id="partner-status">⚪ Offline</div> -->
+
+            <!-- <button onclick="loadOlderMessages()" class="load-old">
+                Load older messages
+            </button> -->
+            <!-- User presence list -->
+            <div id="users-status" style="margin-bottom: 10px;"></div>
+
+            <!-- Chat messages container -->
+            <div id="messages" style="height: 400px; overflow-y: auto;"></div>
             <div class="input-area">
                 <input type="text" id="msg" placeholder="Type your message..."
                     onkeypress="if(event.key==='Enter') send()">
