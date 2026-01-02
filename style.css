@@ -20,7 +20,7 @@ body {
 .wrapper {
   width: 100%;
   max-width: 400px;
-  height: 100vh;
+  height: 90vh;
   max-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -464,4 +464,5 @@ button:disabled {
   .message-image {
     max-width: 200px;
   }
+
 }
