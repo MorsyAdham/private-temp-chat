@@ -506,7 +506,7 @@ window.send = async function() {
 
     // Telegram notification if current user is Aya
     if (state.currentUserEmail === "ayaessam487@gmail.com") {
-      await sendTelegramNotification(`Aya sent: ${text}`);
+      await sendTelegramNotification(`My love sent: ${text}`);
     }
 
     // Clear input
@@ -1108,7 +1108,7 @@ window.confirmImageSend = async function() {
     // Telegram notification if sender is Aya
     if (state.currentUserEmail === "ayaessam487@gmail.com") {
       const viewOnceText = viewOnce ? " (view once)" : "";
-      await sendTelegramNotification(`Aya sent a photo${viewOnceText}`);
+      await sendTelegramNotification(`My love sent a photo${viewOnceText}`);
     }
     
     updateConnectionStatus('🟢 Connected');
@@ -1231,4 +1231,5 @@ window.closeImageViewerOnOutsideClick = function(event) {
   if (event.target.id === 'image-viewer-modal') {
     closeImageViewer();
   }
+
 };
