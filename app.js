@@ -12,8 +12,8 @@ const CONFIG = {
     chatId: "5637769598"
   },
   pagination: {
-    pageSize: 50,
-    initialLoad: 100
+    initialLoad: 200,
+    pageSize: 200
   }
 };
 
@@ -36,19 +36,20 @@ const state = {
   oldestMessageTimestamp: null,
   isLoadingOlderMessages: false,
   hasMoreMessages: true,
-  unreadMessages: new Set(), // Track unread message IDs
-  isAtBottom: true, // Track if user is at bottom of messages
-  selectedImageFile: null, // Currently selected image for sending
-  selectedImageDataUrl: null // Base64 preview of selected image
+  unreadMessages: new Set(),
+  isAtBottom: true,
+  selectedImageFile: null,
+  selectedImageDataUrl: null,
+  searchResults: [],
+  currentSearchIndex: -1,
+  allMessages: [], // Store all loaded messages for search
+  renderedDates: new Set(),
 };
 
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
 
-/**
- * Initialize Supabase client on page load
- */
 function initializeApp() {
   state.supabaseClient = window.supabase.createClient(
     CONFIG.supabase.url,
@@ -60,10 +61,7 @@ function initializeApp() {
 // AUTHENTICATION
 // ============================================================================
 
-/**
- * Handle user login with email/password
- */
-window.login = async function() {
+window.login = async function () {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
 
@@ -73,7 +71,6 @@ window.login = async function() {
   }
 
   try {
-    // Authenticate with Supabase
     const { data, error } = await state.supabaseClient.auth.signInWithPassword({
       email,
       password
@@ -81,7 +78,6 @@ window.login = async function() {
 
     if (error) throw error;
 
-    // RLS policies will handle authorization, but we double-check client-side
     if (!ALLOWED_EMAILS.includes(data.user.email)) {
       await state.supabaseClient.auth.signOut();
       showAlert("Access denied. You are not authorized to use this chat.");
@@ -90,21 +86,14 @@ window.login = async function() {
 
     state.currentUserEmail = data.user.email;
 
-    // Request notification permissions
     await requestNotificationPermission();
-
-    // Update UI to show chat
     showChatScreen();
-
-    // Set user as online
     await updatePresence(true);
 
-    // Send Telegram notification for Aya login
     if (state.currentUserEmail === "ayaessam487@gmail.com") {
       await sendTelegramNotification("My Love just logged in! 💕");
     }
 
-    // Initialize chat
     await initializeChat();
 
   } catch (error) {
@@ -113,18 +102,12 @@ window.login = async function() {
   }
 };
 
-/**
- * Request browser notification permission
- */
 async function requestNotificationPermission() {
   if ("Notification" in window && Notification.permission === "default") {
     await Notification.requestPermission();
   }
 }
 
-/**
- * Update user presence status in database
- */
 async function updatePresence(isOnline) {
   try {
     await state.supabaseClient.from("presence").upsert({
@@ -141,25 +124,59 @@ async function updatePresence(isOnline) {
 // CHAT INITIALIZATION
 // ============================================================================
 
-/**
- * Initialize chat: load messages and setup realtime subscription
- */
+function getDateLabel(timestamp) {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+
+  return date.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+async function loadAllMessagesFromDB() {
+  const PAGE_SIZE = 1000;
+  let allMessages = [];
+  let from = 0;
+  let to = PAGE_SIZE - 1;
+
+  while (true) {
+    const { data, error } = await state.supabaseClient
+      .from("chat_messages")
+      .select("*")
+      .order("created_at", { ascending: true })
+      .range(from, to);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) break;
+
+    allMessages = allMessages.concat(data);
+
+    // Stop if less than page size → no more data
+    if (data.length < PAGE_SIZE) break;
+
+    from += PAGE_SIZE;
+    to += PAGE_SIZE;
+  }
+
+  return allMessages;
+}
+
 async function initializeChat() {
   updateConnectionStatus("🔄 Loading messages...");
 
   try {
-    // Load initial batch of messages
     await loadInitialMessages();
-
-    // Setup realtime subscription for new messages
     await setupRealtimeSubscription();
-
-    // Setup read receipt listener
     setupReadReceiptListener();
-
-    // Setup scroll handler for load more button visibility
     setupScrollHandler();
-
     updateConnectionStatus("🟢 Connected");
 
   } catch (error) {
@@ -169,9 +186,7 @@ async function initializeChat() {
   }
 }
 
-/**
- * Load initial batch of messages (most recent)
- */
+// ✅ FIX #1: Properly order messages by timestamp
 async function loadInitialMessages() {
   try {
     const { data, error } = await state.supabaseClient
@@ -182,43 +197,68 @@ async function loadInitialMessages() {
 
     if (error) throw error;
 
-    if (data && data.length > 0) {
-      // Reverse to show oldest first
-      const messages = data.reverse();
-      
-      // Track oldest message for pagination
-      state.oldestMessageTimestamp = messages[0].created_at;
-      
-      // Check if there are more messages to load
-      state.hasMoreMessages = data.length === CONFIG.pagination.initialLoad;
+    if (!data || data.length === 0) return;
 
-      // Render messages
-      messages.forEach(msg => renderMessage(msg, false));
+    // Reverse to chronological order
+    const messages = sortMessagesByTime(data);
 
-      // Scroll to bottom
-      scrollToBottom(true);
+    state.oldestMessageTimestamp = messages[0].created_at;
+    state.allMessages = messages.slice();
 
-      // Mark received messages as read
-      await markVisibleMessagesAsRead();
-    }
+    messages.forEach(msg => renderMessage(msg));
+
+    scrollToBottom(false);
+    await markVisibleMessagesAsRead();
 
   } catch (error) {
-    console.error("Error loading messages:", error);
+    console.error("Initial load failed:", error);
     throw error;
   }
 }
 
-/**
- * Load older messages (pagination)
- */
-window.loadOlderMessages = async function() {
-  if (state.isLoadingOlderMessages || !state.hasMoreMessages) {
-    return;
+// ✅ FIX #2: Reload chat function
+window.reloadChat = async function () {
+  updateConnectionStatus("🔄 Reloading...");
+
+  try {
+    // Unsubscribe from current channel
+    if (state.channel) {
+      await state.channel.unsubscribe();
+      state.channel = null;
+    }
+
+    // Clear current messages
+    const messagesDiv = document.getElementById("messages");
+    const loadButton = document.getElementById("load-more-btn");
+    messagesDiv.innerHTML = "";
+    messagesDiv.appendChild(loadButton);
+
+    // Reset state
+    state.oldestMessageTimestamp = null;
+    state.hasMoreMessages = true;
+    state.unreadMessages.clear();
+    state.allMessages = [];
+
+    // Reload everything
+    await loadInitialMessages();
+    await setupRealtimeSubscription();
+
+    updateConnectionStatus("🟢 Connected");
+    showAlert("Chat reloaded successfully!");
+
+  } catch (error) {
+    console.error("Reload error:", error);
+    updateConnectionStatus("🔴 Reload failed");
+    showAlert("Failed to reload chat. Please try again.");
   }
+};
+
+window.loadOlderMessages = async function () {
+  if (state.isLoadingOlderMessages || !state.hasMoreMessages) return;
 
   state.isLoadingOlderMessages = true;
   const loadButton = document.getElementById("load-more-btn");
-  if (loadButton) loadButton.textContent = "Loading...";
+  loadButton.textContent = "Loading...";
 
   try {
     const { data, error } = await state.supabaseClient
@@ -230,107 +270,225 @@ window.loadOlderMessages = async function() {
 
     if (error) throw error;
 
-    if (data && data.length > 0) {
-      // Save current scroll position
-      const messagesDiv = document.getElementById("messages");
-      const oldScrollHeight = messagesDiv.scrollHeight;
-
-      // Reverse and prepend messages (after the load button)
-      const messages = data.reverse();
-      state.oldestMessageTimestamp = messages[0].created_at;
-
-      messages.forEach(msg => renderMessage(msg, true));
-
-      // Restore scroll position (keep user at same visual position)
-      messagesDiv.scrollTop = messagesDiv.scrollHeight - oldScrollHeight;
-
-      // Check if more messages exist
-      state.hasMoreMessages = data.length === CONFIG.pagination.pageSize;
-    } else {
+    if (!data || data.length === 0) {
       state.hasMoreMessages = false;
+      updateLoadMoreButton();
+      return;
     }
 
-    // Update button text
+    const messagesDiv = document.getElementById("messages");
+    const oldScrollHeight = messagesDiv.scrollHeight;
+
+    // Normalize order (old → new)
+    const newMessages = sortMessagesByTime(data);
+
+    // Filter out duplicates (CRITICAL)
+    const trulyNewMessages = newMessages.filter(
+      msg => !state.allMessages.some(m => m.id === msg.id)
+    );
+
+    if (trulyNewMessages.length === 0) {
+      updateLoadMoreButton();
+      return;
+    }
+
+    // Update cursor BEFORE render
+    state.oldestMessageTimestamp = trulyNewMessages[0].created_at;
+
+    // Merge ONCE and sort ONCE
+    state.allMessages = sortMessagesByTime([
+      ...trulyNewMessages,
+      ...state.allMessages
+    ]);
+
+    // Render ONLY new messages (prepend)
+    // Remove ALL message bubbles (not the button)
+    const loadButton = document.getElementById("load-more-btn");
+
+    messagesDiv.querySelectorAll(".message-bubble").forEach(b => b.remove());
+
+    // Re-render EVERYTHING from state (guaranteed order)
+    state.allMessages.forEach(msg => renderMessage(msg, false));
+
+    // Restore scroll position
+    messagesDiv.scrollTop =
+      messagesDiv.scrollHeight - oldScrollHeight;
+
+
+    // Maintain scroll position
+    messagesDiv.scrollTop =
+      messagesDiv.scrollHeight - oldScrollHeight;
+
+    state.hasMoreMessages = data.length === CONFIG.pagination.pageSize;
     updateLoadMoreButton();
 
   } catch (error) {
-    console.error("Error loading older messages:", error);
+    console.error("Load older messages failed:", error);
     showAlert("Failed to load older messages");
   } finally {
     state.isLoadingOlderMessages = false;
   }
 };
 
-/**
- * Update load more button text and visibility
- */
+window.loadAllMessages = async function () {
+  if (state.isLoadingOlderMessages) return;
+
+  const loadAllBtn = document.getElementById("load-all-btn");
+  const loadMoreBtn = document.getElementById("load-more-btn");
+
+  state.isLoadingOlderMessages = true;
+  loadAllBtn.textContent = "Loading all...";
+  loadAllBtn.disabled = true;
+
+  try {
+    updateConnectionStatus("🔄 Loading all messages...");
+
+    // 1️⃣ Fetch everything
+    const allMessages = await loadAllMessagesFromDB();
+
+    if (!allMessages || allMessages.length === 0) return;
+
+    // 2️⃣ Sort once
+    const sortedMessages = sortMessagesByTime(allMessages);
+
+    // 3️⃣ Reset state
+    state.allMessages = sortedMessages;
+    state.oldestMessageTimestamp = sortedMessages[0].created_at;
+    state.hasMoreMessages = false;
+
+    // 4️⃣ Clear UI (keep buttons)
+    const messagesDiv = document.getElementById("messages");
+    messagesDiv
+      .querySelectorAll(".message-bubble")
+      .forEach(b => b.remove());
+
+    // 5️⃣ Render everything
+    sortedMessages.forEach(msg => renderMessage(msg, false));
+
+    scrollToBottom(false);
+
+    // 6️⃣ Disable pagination buttons
+    loadMoreBtn.textContent = "All messages loaded";
+    loadMoreBtn.disabled = true;
+    loadAllBtn.textContent = "All messages loaded";
+
+    updateConnectionStatus("🟢 All messages loaded");
+
+  } catch (error) {
+    console.error("Load all messages failed:", error);
+    showAlert("Failed to load all messages");
+    loadAllBtn.textContent = "Load all messages";
+    loadAllBtn.disabled = false;
+  } finally {
+    state.isLoadingOlderMessages = false;
+  }
+};
+
 function updateLoadMoreButton() {
   const loadButton = document.getElementById("load-more-btn");
+  const loadAllBtn = document.getElementById("load-all-btn");
   if (!loadButton) return;
 
   if (state.hasMoreMessages) {
     loadButton.textContent = "Load older messages";
     loadButton.disabled = false;
+    if (loadAllBtn) loadAllBtn.disabled = false;
   } else {
     loadButton.textContent = "No more messages";
     loadButton.disabled = true;
+    if (loadAllBtn) loadAllBtn.disabled = true;
   }
 }
 
-/**
- * Setup scroll handler to show/hide load more button
- */
+
 function setupScrollHandler() {
   const messagesDiv = document.getElementById("messages");
-  const loadButton = document.getElementById("load-more-btn");
-  
-  if (!messagesDiv || !loadButton) return;
+  const jumpBtn = document.getElementById("jump-bottom-btn");
 
   messagesDiv.addEventListener("scroll", () => {
-    // Show load button when scrolled to top (within 50px)
-    if (messagesDiv.scrollTop < 50 && state.hasMoreMessages) {
-      loadButton.style.display = "block";
-    } else {
-      loadButton.style.display = "none";
+    const atBottom =
+      messagesDiv.scrollHeight - messagesDiv.scrollTop <=
+      messagesDiv.clientHeight + 50;
+
+    state.isAtBottom = atBottom;
+
+    if (jumpBtn) {
+      jumpBtn.style.display = atBottom ? "none" : "flex";
     }
 
-    // Check if at bottom for read receipts
-    const isAtBottom = 
-      messagesDiv.scrollHeight - messagesDiv.scrollTop <= messagesDiv.clientHeight + 50;
-
-    state.isAtBottom = isAtBottom;
-
-    if (isAtBottom) {
+    if (atBottom) {
       markVisibleMessagesAsRead();
     }
+  });
+
+  const loadBtn = document.getElementById("load-more-btn");
+
+  messagesDiv.addEventListener("scroll", () => {
+    const atTop = messagesDiv.scrollTop <= 30;
+    const atBottom =
+      messagesDiv.scrollHeight - messagesDiv.scrollTop <=
+      messagesDiv.clientHeight + 50;
+
+    state.isAtBottom = atBottom;
+
+    // Jump button
+    jumpBtn.style.display = atBottom ? "none" : "flex";
+
+    // Load more button
+    loadBtn.style.display =
+      atTop && state.hasMoreMessages ? "block" : "none";
+
+    if (atBottom) {
+      markVisibleMessagesAsRead();
+    }
+    updateFloatingDate();
+
   });
 }
 
 // ============================================================================
-// REALTIME SUBSCRIPTION
+// REALTIME SUBSCRIPTION  
 // ============================================================================
 
-/**
- * Setup Supabase realtime channel for new messages
- */
 async function setupRealtimeSubscription() {
-  // Method 1: Using broadcast (faster but requires Realtime to be properly configured)
   state.channel = state.supabaseClient.channel("private-room", {
-    config: {
-      broadcast: { self: false }
-    }
+    config: { broadcast: { self: false } }
   });
 
-  // Listen for broadcast messages
   state.channel.on("broadcast", { event: "new-message" }, async (payload) => {
     const message = payload.payload;
+    if (!message || !message.id) return;
 
-    if (!message || !message.id) {
-      return;
+    // Check if we need a date separator
+    const lastMsg = state.allMessages[state.allMessages.length - 1];
+    if (lastMsg) {
+      const lastDate = new Date(lastMsg.created_at).toDateString();
+      const newDate = new Date(message.created_at).toDateString();
     }
 
-    renderMessage(message, false);
-    
+    // Ignore duplicates
+    if (state.allMessages.some(m => m.id === message.id)) return;
+
+    // Insert → sort
+    state.allMessages.push(message);
+    sortMessagesByTime(state.allMessages);
+
+    // Render only if it belongs at the end
+    const lastRendered =
+      document.querySelector(".message-bubble:last-of-type");
+
+    const lastTimestamp = lastRendered
+      ? new Date(lastRendered.dataset.timestamp)
+      : null;
+
+    if (!lastTimestamp || new Date(message.created_at) >= lastTimestamp) {
+      renderMessage(message, false);
+
+      if (state.isAtBottom) {
+        scrollToBottom(true);
+      }
+    }
+
     if (state.isAtBottom) {
       scrollToBottom(true);
     }
@@ -339,10 +497,9 @@ async function setupRealtimeSubscription() {
       if (state.isAtBottom) {
         await markMessageAsRead(message.id);
       }
-      
+
       showNotification(USER_NAMES[message.sender] || message.sender, message.text || "Sent a photo");
 
-      // Only send Telegram notifications for Aya's activity
       if (message.sender === "ayaessam487@gmail.com") {
         const messageContent = message.message_type === 'image' ? 'a photo' : message.text;
         await sendTelegramNotification(`My Love sent ${messageContent}`);
@@ -350,11 +507,9 @@ async function setupRealtimeSubscription() {
     }
   });
 
-  // Listen for image-viewed broadcasts to update sender's UI
   state.channel.on("broadcast", { event: "image-viewed" }, async (payload) => {
-    const { messageId, viewerId } = payload.payload;
-    
-    // Update the message to show "Opened" status for sender
+    const { messageId } = payload.payload;
+
     const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
     if (messageElement) {
       const imageContainer = messageElement.querySelector('.message-image-container');
@@ -364,43 +519,56 @@ async function setupRealtimeSubscription() {
     }
   });
 
-  // Method 2: BACKUP - Listen for database INSERT events (more reliable)
-  state.channel.on(
-    "postgres_changes",
-    {
-      event: "INSERT",
-      schema: "public",
-      table: "chat_messages"
-    },
-    async (payload) => {
-      const message = payload.new;
+  state.channel.on("postgres_changes", {
+    event: "INSERT",
+    schema: "public",
+    table: "chat_messages"
+  }, async (payload) => {
+    const message = payload.new;
+    if (message.sender === state.currentUserEmail) return;
 
-      // Don't render if it's from current user (already rendered locally)
-      if (message.sender === state.currentUserEmail) {
-        return;
-      }
+    const lastMsg = state.allMessages[state.allMessages.length - 1];
+    if (lastMsg) {
+      const lastDate = new Date(lastMsg.created_at).toDateString();
+      const newDate = new Date(message.created_at).toDateString();
+    }
 
+    // Ignore duplicates
+    if (state.allMessages.some(m => m.id === message.id)) return;
+
+    // Insert → sort
+    state.allMessages.push(message);
+    sortMessagesByTime(state.allMessages);
+
+    // Render only if it belongs at the end
+    const lastRendered =
+      document.querySelector(".message-bubble:last-of-type");
+
+    const lastTimestamp = lastRendered
+      ? new Date(lastRendered.dataset.timestamp)
+      : null;
+
+    if (!lastTimestamp || new Date(message.created_at) >= lastTimestamp) {
       renderMessage(message, false);
-      
+
       if (state.isAtBottom) {
         scrollToBottom(true);
       }
-
-      if (state.isAtBottom) {
-        await markMessageAsRead(message.id);
-      }
-      
-      showNotification(USER_NAMES[message.sender] || message.sender, message.text || "Sent a photo");
-
-      // Only send Telegram notifications for Aya's activity
-      if (message.sender === "ayaessam487@gmail.com") {
-        const messageContent = message.message_type === 'image' ? 'a photo' : message.text;
-        await sendTelegramNotification(`My Love sent ${messageContent}`);
-      }
     }
-  );
 
-  // Subscribe to channel
+    if (state.isAtBottom) {
+      scrollToBottom(true);
+      await markMessageAsRead(message.id);
+    }
+
+    showNotification(USER_NAMES[message.sender] || message.sender, message.text || "Sent a photo");
+
+    if (message.sender === "ayaessam487@gmail.com") {
+      const messageContent = message.message_type === 'image' ? 'a photo' : message.text;
+      await sendTelegramNotification(`My Love sent ${messageContent}`);
+    }
+  });
+
   await state.channel.subscribe((status) => {
     if (status === "SUBSCRIBED") {
       updateConnectionStatus("🟢 Connected");
@@ -412,53 +580,137 @@ async function setupRealtimeSubscription() {
   });
 }
 
-/**
- * Setup listener for read receipt updates
- */
 function setupReadReceiptListener() {
   state.supabaseClient
     .channel("read-receipts")
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "chat_messages",
-        filter: `sender=eq.${state.currentUserEmail}`
-      },
-      (payload) => {
-        // Update read receipt UI for sender's messages
-        if (payload.new.read) {
-          updateMessageReadReceipt(payload.new.id, true);
-        }
+    .on("postgres_changes", {
+      event: "UPDATE",
+      schema: "public",
+      table: "chat_messages",
+      filter: `sender=eq.${state.currentUserEmail}`
+    }, (payload) => {
+      if (payload.new.read) {
+        updateMessageReadReceipt(payload.new.id, true);
       }
-    )
+    })
     .subscribe();
 }
+
+// ============================================================================
+// SEARCH FUNCTIONALITY
+// ============================================================================
+
+window.toggleSearch = function () {
+  const searchBar = document.getElementById("search-bar");
+  const searchInput = document.getElementById("search-input");
+
+  if (searchBar.style.display === "none") {
+    searchBar.style.display = "flex";
+    searchInput.focus();
+  } else {
+    closeSearch();
+  }
+};
+
+window.closeSearch = function () {
+  const searchBar = document.getElementById("search-bar");
+  const searchInput = document.getElementById("search-input");
+
+  searchBar.style.display = "none";
+  searchInput.value = "";
+
+  // Remove all highlights
+  document.querySelectorAll(".message-bubble.highlight").forEach(el => {
+    el.classList.remove("highlight");
+  });
+
+  state.searchResults = [];
+  state.currentSearchIndex = -1;
+};
+
+window.searchMessages = function () {
+  const searchInput = document.getElementById("search-input");
+  const query = searchInput.value.trim().toLowerCase();
+
+  // Remove previous highlights
+  document.querySelectorAll(".message-bubble.highlight").forEach(el => {
+    el.classList.remove("highlight");
+  });
+
+  if (!query) {
+    state.searchResults = [];
+    state.currentSearchIndex = -1;
+    return;
+  }
+
+  // Search in all messages
+  state.searchResults = state.allMessages.filter(msg => {
+    if (msg.message_type === 'image') return false;
+    return msg.text && msg.text.toLowerCase().includes(query);
+  });
+
+  if (state.searchResults.length > 0) {
+    state.currentSearchIndex = 0;
+    highlightAndScrollToResult(state.searchResults[0].id);
+  }
+};
+
+function highlightAndScrollToResult(messageId) {
+  // Remove previous highlight
+  document
+    .querySelectorAll(".message-bubble.highlight")
+    .forEach(el => el.classList.remove("highlight"));
+
+  const messageElement =
+    document.querySelector(`[data-message-id="${messageId}"]`);
+
+  if (messageElement) {
+    messageElement.classList.add("highlight");
+
+    messageElement.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+  }
+}
+
+window.searchNext = function () {
+  if (!state.searchResults.length) return;
+
+  state.currentSearchIndex =
+    (state.currentSearchIndex + 1) % state.searchResults.length;
+
+  const message = state.searchResults[state.currentSearchIndex];
+  highlightAndScrollToResult(message.id);
+};
+
+window.searchPrevious = function () {
+  if (!state.searchResults.length) return;
+
+  state.currentSearchIndex =
+    (state.currentSearchIndex - 1 + state.searchResults.length) %
+    state.searchResults.length;
+
+  const message = state.searchResults[state.currentSearchIndex];
+  highlightAndScrollToResult(message.id);
+};
 
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
-/**
- * Detect if text is primarily Arabic
- * @param {string} text - Text to analyze
- * @returns {boolean} - True if Arabic, false otherwise
- */
+function sortMessagesByTime(messages) {
+  return messages.sort(
+    (a, b) => new Date(a.created_at) - new Date(b.created_at)
+  );
+}
+
 function isArabic(text) {
-  // Arabic Unicode ranges: \u0600-\u06FF (Arabic), \u0750-\u077F (Arabic Supplement)
-  const arabicPattern = /[\u0600-\u06FF\u0750-\u077F]/;
   const arabicChars = (text.match(/[\u0600-\u06FF\u0750-\u077F]/g) || []).length;
-  const totalChars = text.replace(/\s/g, '').length; // Exclude spaces
-  
-  // If more than 30% of characters are Arabic, consider it Arabic text
+  const totalChars = text.replace(/\s/g, '').length;
   return totalChars > 0 && (arabicChars / totalChars) > 0.3;
 }
 
-/**
- * Auto-resize textarea as user types
- * @param {HTMLTextAreaElement} textarea - The textarea element
- */
 function autoResizeTextarea(textarea) {
   textarea.style.height = 'auto';
   textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
@@ -468,19 +720,15 @@ function autoResizeTextarea(textarea) {
 // SEND MESSAGE
 // ============================================================================
 
-/**
- * Send a new message
- */
-window.send = async function() {
-  const input = document.getElementById("msg");
-  const text = input.value.trim();
+window.send = async function () {
+  const textarea = document.getElementById("msg");
+  const text = textarea.value.trim();
 
   if (!text || !state.channel) {
     return;
   }
 
   try {
-    // Insert message into database
     const { data, error } = await state.supabaseClient
       .from("chat_messages")
       .insert([{
@@ -493,24 +741,35 @@ window.send = async function() {
 
     if (error) throw error;
 
-    // Render message locally for sender
-    renderMessage(data, false);
+    // Check if we need date separator
+    const lastMsg = state.allMessages[state.allMessages.length - 1];
+    if (lastMsg) {
+      const lastDate = new Date(lastMsg.created_at).toDateString();
+      const newDate = new Date(data.created_at).toDateString();
+    }
+
+    if (!state.allMessages.some(m => m.id === data.id)) {
+      state.allMessages.push(data);
+      sortMessagesByTime(state.allMessages);
+      renderMessage(data, false);
+    }
+
     scrollToBottom(true);
 
-    // Broadcast to other users via realtime
     await state.channel.send({
       type: "broadcast",
       event: "new-message",
       payload: data
     });
 
-    // Telegram notification if current user is Aya
     if (state.currentUserEmail === "ayaessam487@gmail.com") {
-      await sendTelegramNotification(`My love sent: ${text}`);
+      await sendTelegramNotification(`My Love sent: ${text}`);
     }
 
-    // Clear input
-    input.value = "";
+    textarea.value = "";
+    textarea.style.height = '40px';
+    textarea.style.direction = 'ltr';
+    textarea.style.textAlign = 'left';
 
   } catch (error) {
     console.error("Error sending message:", error);
@@ -522,31 +781,24 @@ window.send = async function() {
 // MESSAGE RENDERING
 // ============================================================================
 
-/**
- * Render a single message in the chat UI
- * @param {Object} message - Message object from database
- * @param {boolean} prepend - If true, add after load button; if false, add to bottom
- */
 function renderMessage(message, prepend = false) {
   const messagesDiv = document.getElementById("messages");
   const isSender = message.sender === state.currentUserEmail;
   const messageType = message.message_type || 'text';
 
-  // Check if message already exists (prevent duplicates)
   const existingMessage = document.querySelector(`[data-message-id="${message.id}"]`);
   if (existingMessage) {
     return;
   }
 
-  // Create message bubble
   const bubble = document.createElement("div");
   bubble.className = `message-bubble ${isSender ? "sender" : "receiver"}`;
   if (messageType === 'image') {
     bubble.classList.add('image-message');
   }
   bubble.dataset.messageId = message.id;
+  bubble.dataset.timestamp = message.created_at; // Store timestamp for date comparison
 
-  // Add sender name for received messages
   if (!isSender) {
     const nameDiv = document.createElement("div");
     nameDiv.className = "sender-name";
@@ -554,39 +806,32 @@ function renderMessage(message, prepend = false) {
     bubble.appendChild(nameDiv);
   }
 
-  // Render based on message type
   if (messageType === 'image') {
-    // Image message
     const imageContainer = document.createElement("div");
     imageContainer.className = "message-image-container";
-    
+
     const viewOnce = message.view_once || false;
     const viewedBy = message.viewed_by || [];
     const hasViewed = viewedBy.includes(state.currentUserEmail);
-    const wasOpened = viewedBy.length > 0; // Check if anyone opened it
-    
-    // Check if should show image or status overlay
+    const wasOpened = viewedBy.length > 0;
+
     if (viewOnce && (hasViewed || (isSender && wasOpened))) {
-      // Show "opened" overlay for sender after recipient opens, or "viewed" for receiver
       const statusText = isSender ? '📷 Opened' : '📷 Photo viewed';
       imageContainer.innerHTML = `<div class="image-viewed-overlay">${statusText}</div>`;
       imageContainer.style.width = '200px';
       imageContainer.style.height = '200px';
       imageContainer.style.background = '#1e293b';
     } else if (viewOnce && isSender && !wasOpened) {
-      // Show "sent" status for sender before recipient opens
       imageContainer.innerHTML = '<div class="image-viewed-overlay">📷 Sent</div>';
       imageContainer.style.width = '200px';
       imageContainer.style.height = '200px';
       imageContainer.style.background = '#1e293b';
     } else if (viewOnce && !isSender && !hasViewed) {
-      // Show actual image for receiver who hasn't viewed yet
       const img = document.createElement("img");
       img.className = "message-image";
       img.alt = "Sent image";
       img.loading = "lazy";
-      
-      // Generate signed URL for the image
+
       (async () => {
         try {
           let imagePath = message.image_url;
@@ -594,37 +839,35 @@ function renderMessage(message, prepend = false) {
             const urlParts = imagePath.split('/chat-images/');
             imagePath = urlParts[1] || imagePath;
           }
-          
+
           const { data: signedUrlData, error: signedUrlError } = await state.supabaseClient.storage
             .from('chat-images')
             .createSignedUrl(imagePath, 3600);
-          
+
           if (signedUrlError) throw signedUrlError;
-          
+
           img.src = signedUrlData.signedUrl;
         } catch (error) {
           console.error('Error generating signed URL:', error);
           img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>';
         }
       })();
-      
+
       img.onclick = () => openImageViewer(message.id, message.image_url, viewOnce, viewedBy, message.sender);
       img.style.cursor = 'pointer';
-      
+
       imageContainer.appendChild(img);
-      
-      // Add view-once indicator
+
       const overlay = document.createElement("div");
       overlay.className = "view-once-overlay";
       overlay.innerHTML = '🔒 View once';
       imageContainer.appendChild(overlay);
     } else if (!viewOnce) {
-      // Regular image (not view-once)
       const img = document.createElement("img");
       img.className = "message-image";
       img.alt = "Sent image";
       img.loading = "lazy";
-      
+
       (async () => {
         try {
           let imagePath = message.image_url;
@@ -632,50 +875,46 @@ function renderMessage(message, prepend = false) {
             const urlParts = imagePath.split('/chat-images/');
             imagePath = urlParts[1] || imagePath;
           }
-          
+
           const { data: signedUrlData, error: signedUrlError } = await state.supabaseClient.storage
             .from('chat-images')
             .createSignedUrl(imagePath, 3600);
-          
+
           if (signedUrlError) throw signedUrlError;
-          
+
           img.src = signedUrlData.signedUrl;
         } catch (error) {
           console.error('Error generating signed URL:', error);
           img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>';
         }
       })();
-      
+
       img.onclick = () => openImageViewer(message.id, message.image_url, viewOnce, viewedBy, message.sender);
       img.style.cursor = 'pointer';
-      
+
       imageContainer.appendChild(img);
     }
-    
+
     bubble.appendChild(imageContainer);
-    
+
   } else {
-    // Text message
     const textDiv = document.createElement("div");
     textDiv.className = "message-text";
     textDiv.textContent = message.text;
-    
-    // Auto-detect and apply text direction
+
     if (isArabic(message.text)) {
       textDiv.classList.add('rtl');
     } else {
       textDiv.classList.add('ltr');
     }
-    
+
     bubble.appendChild(textDiv);
   }
 
-  // Message metadata (time + read receipt)
   const metaDiv = document.createElement("div");
   metaDiv.className = "message-meta";
   metaDiv.textContent = formatTime(message.created_at);
 
-  // Add read receipt for sender's messages
   if (isSender) {
     const receipt = document.createElement("span");
     receipt.className = `receipt ${message.read ? "read" : "sent"}`;
@@ -685,29 +924,22 @@ function renderMessage(message, prepend = false) {
 
   bubble.appendChild(metaDiv);
 
-  // Add to DOM
   if (prepend) {
-    // Find the first message bubble (not the load button)
     const firstMessage = messagesDiv.querySelector(".message-bubble");
     if (firstMessage) {
       messagesDiv.insertBefore(bubble, firstMessage);
     } else {
-      // No messages yet, just append
       messagesDiv.appendChild(bubble);
     }
   } else {
     messagesDiv.appendChild(bubble);
   }
 
-  // Track unread messages from others
   if (!isSender && !message.read) {
     state.unreadMessages.add(message.id);
   }
 }
 
-/**
- * Update read receipt UI for a specific message
- */
 function updateMessageReadReceipt(messageId, isRead) {
   const bubble = document.querySelector(`[data-message-id="${messageId}"]`);
   if (!bubble) return;
@@ -723,9 +955,6 @@ function updateMessageReadReceipt(messageId, isRead) {
 // READ RECEIPTS
 // ============================================================================
 
-/**
- * Mark a specific message as read
- */
 async function markMessageAsRead(messageId) {
   try {
     await state.supabaseClient
@@ -739,15 +968,12 @@ async function markMessageAsRead(messageId) {
   }
 }
 
-/**
- * Mark all visible unread messages as read
- */
 async function markVisibleMessagesAsRead() {
   if (state.unreadMessages.size === 0) return;
 
   try {
     const unreadIds = Array.from(state.unreadMessages);
-    
+
     await state.supabaseClient
       .from("chat_messages")
       .update({ read: true })
@@ -764,21 +990,14 @@ async function markVisibleMessagesAsRead() {
 // NOTIFICATIONS
 // ============================================================================
 
-/**
- * Show browser notification
- */
 function showNotification(title, body) {
   if ("Notification" in window && Notification.permission === "granted") {
     new Notification(title, {
       body: body,
-      icon: "/favicon.ico"
     });
   }
 }
 
-/**
- * Send notification via Telegram
- */
 async function sendTelegramNotification(message) {
   try {
     await fetch(
@@ -800,33 +1019,40 @@ async function sendTelegramNotification(message) {
 // ============================================================================
 // UI HELPERS
 // ============================================================================
+function updateFloatingDate() {
+  const messagesDiv = document.getElementById("messages");
+  const floatingDate = document.getElementById("floating-date");
 
-/**
- * Show chat screen and hide login screen
- */
+  const bubbles = messagesDiv.querySelectorAll(".message-bubble");
+  if (!bubbles.length) return;
+
+  for (let bubble of bubbles) {
+    const rect = bubble.getBoundingClientRect();
+    const containerRect = messagesDiv.getBoundingClientRect();
+
+    // First visible message
+    if (rect.bottom > containerRect.top + 40) {
+      const timestamp = bubble.dataset.timestamp;
+      floatingDate.textContent = getDateLabel(timestamp);
+      break;
+    }
+  }
+}
+
 function showChatScreen() {
   document.getElementById("login").style.display = "none";
   document.getElementById("chat").style.display = "flex";
 }
 
-/**
- * Update connection status indicator
- */
 function updateConnectionStatus(text) {
   const statusDiv = document.getElementById("connection-status");
   if (statusDiv) statusDiv.textContent = text;
 }
 
-/**
- * Show alert message to user
- */
 function showAlert(message) {
   alert(message);
 }
 
-/**
- * Format timestamp to readable time
- */
 function formatTime(timestamp) {
   return new Date(timestamp).toLocaleTimeString([], {
     hour: "2-digit",
@@ -834,10 +1060,6 @@ function formatTime(timestamp) {
   });
 }
 
-/**
- * Scroll messages container to bottom
- * @param {boolean} smooth - If true, scroll smoothly
- */
 function scrollToBottom(smooth = false) {
   const messagesDiv = document.getElementById("messages");
   if (smooth) {
@@ -851,23 +1073,20 @@ function scrollToBottom(smooth = false) {
   state.isAtBottom = true;
 }
 
-/**
- * Clear all messages from UI (panic button)
- */
 function clearMessagesUI() {
   const messagesDiv = document.getElementById("messages");
   const loadButton = document.getElementById("load-more-btn");
-  
-  // Remove only message bubbles, keep the load button
+
   const messageBubbles = messagesDiv.querySelectorAll(".message-bubble");
+  const dateSeparators = messagesDiv.querySelectorAll(".date-separator");
+
   messageBubbles.forEach(bubble => bubble.remove());
-  
-  // Hide the load button to prevent loading messages after panic
+  dateSeparators.forEach(sep => sep.remove());
+
   if (loadButton) {
     loadButton.style.display = "none";
   }
-  
-  // Disable loading older messages after panic
+
   state.hasMoreMessages = false;
 }
 
@@ -875,10 +1094,7 @@ function clearMessagesUI() {
 // PANIC BUTTON
 // ============================================================================
 
-/**
- * Handle panic button - hides all messages from UI
- */
-window.panic = function() {
+window.panic = function () {
   const confirmed = confirm(
     "⚠️ This will hide all messages from your screen.\n\n" +
     "Messages will still exist in the database.\n\n" +
@@ -895,30 +1111,23 @@ window.panic = function() {
 // EVENT LISTENERS
 // ============================================================================
 
-/**
- * Setup event listeners when DOM is ready
- */
 document.addEventListener("DOMContentLoaded", () => {
   initializeApp();
 
-  // Get textarea element
   const msgTextarea = document.getElementById("msg");
-  
+
   if (msgTextarea) {
-    // Enter key to send message (Shift+Enter for new line)
     msgTextarea.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault(); // Prevent new line
+        e.preventDefault();
         send();
       }
     });
 
-    // Auto-resize textarea and detect language as user types
     msgTextarea.addEventListener("input", (e) => {
       const textarea = e.target;
       autoResizeTextarea(textarea);
-      
-      // Auto-detect text direction
+
       const text = textarea.value;
       if (text.trim().length > 0) {
         if (isArabic(text)) {
@@ -929,44 +1138,52 @@ document.addEventListener("DOMContentLoaded", () => {
           textarea.style.textAlign = 'left';
         }
       } else {
-        // Reset to default when empty
         textarea.style.direction = 'ltr';
         textarea.style.textAlign = 'left';
       }
     });
   }
 
-  // ESC key to close modals
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      // Close image viewer if open
       const imageViewer = document.getElementById("image-viewer-modal");
       if (imageViewer && imageViewer.style.display === "flex") {
         closeImageViewer();
       }
-      
-      // Close image preview if open
+
       const imagePreview = document.getElementById("image-preview-modal");
       if (imagePreview && imagePreview.style.display === "flex") {
         cancelImageSend();
       }
-      
-      // Close image picker if open
+
       const imagePicker = document.getElementById("image-picker-modal");
       if (imagePicker && imagePicker.style.display === "flex") {
         closeImagePicker();
       }
+
+      const searchBar = document.getElementById("search-bar");
+      if (searchBar && searchBar.style.display === "flex") {
+        closeSearch();
+      }
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    const searchBar = document.getElementById("search-bar");
+    if (!searchBar || searchBar.style.display !== "flex") return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      searchNext();
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      searchPrevious();
     }
   });
 });
 
-// ============================================================================
-// CLEANUP ON PAGE UNLOAD
-// ============================================================================
-
-/**
- * Cleanup when user leaves page
- */
 window.addEventListener("beforeunload", async () => {
   if (state.currentUserEmail) {
     await updatePresence(false);
@@ -981,53 +1198,36 @@ window.addEventListener("beforeunload", async () => {
 // IMAGE FUNCTIONALITY
 // ============================================================================
 
-/**
- * Open image picker modal (camera or gallery)
- */
-window.openImagePicker = function() {
+window.openImagePicker = function () {
   document.getElementById("image-picker-modal").style.display = "flex";
 };
 
-/**
- * Close image picker modal
- */
-window.closeImagePicker = function() {
+window.closeImagePicker = function () {
   document.getElementById("image-picker-modal").style.display = "none";
 };
 
-/**
- * Open camera to take photo
- */
-window.openCamera = function() {
+window.openCamera = function () {
   closeImagePicker();
   document.getElementById("camera-input").click();
 };
 
-/**
- * Open gallery to choose photo
- */
-window.openGallery = function() {
+window.openGallery = function () {
   closeImagePicker();
   document.getElementById("image-input").click();
 };
 
-/**
- * Handle image selection from camera or gallery
- */
-window.handleImageSelect = function(event) {
+window.handleImageSelect = function (event) {
   const file = event.target.files[0];
-  
+
   if (!file) return;
-  
-  // Validate file type
+
   if (!file.type.startsWith('image/')) {
     showAlert('Please select an image file');
     return;
   }
 
-  // Store file and create preview
   state.selectedImageFile = file;
-  
+
   const reader = new FileReader();
   reader.onload = (e) => {
     state.selectedImageDataUrl = e.target.result;
@@ -1035,49 +1235,38 @@ window.handleImageSelect = function(event) {
     document.getElementById('image-preview-modal').style.display = 'flex';
   };
   reader.readAsDataURL(file);
-  
-  // Reset input
+
   event.target.value = '';
 };
 
-/**
- * Cancel image send
- */
-window.cancelImageSend = function() {
+window.cancelImageSend = function () {
   state.selectedImageFile = null;
   state.selectedImageDataUrl = null;
   document.getElementById('image-preview-modal').style.display = 'none';
   document.getElementById('view-once-checkbox').checked = false;
 };
 
-/**
- * Confirm and send image
- */
-window.confirmImageSend = async function() {
+window.confirmImageSend = async function () {
   if (!state.selectedImageFile) return;
-  
+
   const viewOnce = document.getElementById('view-once-checkbox').checked;
-  
-  // Hide modal and show loading
+
   document.getElementById('image-preview-modal').style.display = 'none';
   updateConnectionStatus('📤 Uploading image...');
-  
+
   try {
-    // Upload image to Supabase Storage
     const fileExt = state.selectedImageFile.name.split('.').pop();
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
     const filePath = `${state.currentUserEmail}/${fileName}`;
-    
+
     const { data: uploadData, error: uploadError } = await state.supabaseClient.storage
       .from('chat-images')
       .upload(filePath, state.selectedImageFile);
-    
+
     if (uploadError) throw uploadError;
-    
-    // Store the file path instead of URL (we'll generate signed URLs when displaying)
+
     const imageUrl = filePath;
-    
-    // Insert message into database
+
     const { data: messageData, error: messageError } = await state.supabaseClient
       .from('chat_messages')
       .insert([{
@@ -1091,102 +1280,91 @@ window.confirmImageSend = async function() {
       }])
       .select()
       .single();
-    
+
     if (messageError) throw messageError;
-    
-    // Render message locally
+
+    const lastMsg = state.allMessages[state.allMessages.length - 1];
+    if (lastMsg) {
+      const lastDate = new Date(lastMsg.created_at).toDateString();
+      const newDate = new Date(messageData.created_at).toDateString();
+    }
+
     renderMessage(messageData, false);
+    state.allMessages.push(messageData);
     scrollToBottom(true);
-    
-    // Broadcast to other users
+
     await state.channel.send({
       type: 'broadcast',
       event: 'new-message',
       payload: messageData
     });
-    
-    // Telegram notification if sender is Aya
+
     if (state.currentUserEmail === "ayaessam487@gmail.com") {
-      const viewOnceText = viewOnce ? " (view once)" : "";
-      await sendTelegramNotification(`My love sent a photo${viewOnceText}`);
+      const messageType = viewOnce ? "a view-once photo 🔒" : "a photo";
+      await sendTelegramNotification(`My Love sent ${messageType}`);
     }
-    
+
     updateConnectionStatus('🟢 Connected');
-    
+
   } catch (error) {
     console.error('Error sending image:', error);
     showAlert('Failed to send image. Please try again.');
     updateConnectionStatus('🟢 Connected');
   } finally {
-    // Clean up
     state.selectedImageFile = null;
     state.selectedImageDataUrl = null;
     document.getElementById('view-once-checkbox').checked = false;
   }
 };
 
-/**
- * Open image viewer
- */
-window.openImageViewer = async function(messageId, imagePathOrUrl, viewOnce, viewedBy, senderEmail) {
+window.openImageViewer = async function (messageId, imagePathOrUrl, viewOnce, viewedBy, senderEmail) {
   const currentUser = state.currentUserEmail;
   const hasViewed = viewedBy && viewedBy.includes(currentUser);
-  
-  // If view-once and already viewed, don't open
+
   if (viewOnce && hasViewed) {
     return;
   }
-  
+
   try {
-    // Extract file path from URL if it's a full URL (for old messages)
     let imagePath = imagePathOrUrl;
     if (imagePath.includes('http')) {
-      // Old format: extract path from URL
       const urlParts = imagePath.split('/chat-images/');
       imagePath = urlParts[1] || imagePath;
     }
-    
-    // Generate signed URL for viewing
+
     const { data: signedUrlData, error: signedUrlError } = await state.supabaseClient.storage
       .from('chat-images')
-      .createSignedUrl(imagePath, 3600); // 1 hour expiry
-    
+      .createSignedUrl(imagePath, 3600);
+
     if (signedUrlError) throw signedUrlError;
-    
-    // Display image
+
     document.getElementById('viewer-image').src = signedUrlData.signedUrl;
-    
-    // Set info text
+
     const infoDiv = document.getElementById('viewer-info');
     if (viewOnce && !hasViewed) {
       infoDiv.textContent = '🔒 This is a view-once photo';
     } else {
       infoDiv.textContent = '';
     }
-    
+
     document.getElementById('image-viewer-modal').style.display = 'flex';
-    
-    // Mark as viewed if view-once and not already viewed
+
     if (viewOnce && !hasViewed) {
       try {
-        // Update viewed_by array in database
         const { error } = await state.supabaseClient
           .from('chat_messages')
           .update({
             viewed_by: [...(viewedBy || []), currentUser]
           })
           .eq('id', messageId);
-        
+
         if (error) throw error;
-        
-        // Send Telegram notification to sender that image was opened
-        // Only send notification if Aya opened the photo
+
         if (currentUser === "ayaessam487@gmail.com") {
           const senderName = USER_NAMES[senderEmail] || senderEmail;
           await sendTelegramNotification(`My Love opened ${senderName}'s photo 👀`);
         }
-        
-        // Update UI - show "opened" status
+
         setTimeout(() => {
           const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
           if (messageElement) {
@@ -1196,8 +1374,7 @@ window.openImageViewer = async function(messageId, imagePathOrUrl, viewOnce, vie
             }
           }
         }, 100);
-        
-        // Broadcast the update to other users so sender sees "opened" status
+
         if (state.channel) {
           state.channel.send({
             type: 'broadcast',
@@ -1205,7 +1382,7 @@ window.openImageViewer = async function(messageId, imagePathOrUrl, viewOnce, vie
             payload: { messageId, viewerId: currentUser }
           });
         }
-        
+
       } catch (error) {
         console.error('Error marking image as viewed:', error);
       }
@@ -1216,20 +1393,12 @@ window.openImageViewer = async function(messageId, imagePathOrUrl, viewOnce, vie
   }
 };
 
-/**
- * Close image viewer
- */
-window.closeImageViewer = function() {
+window.closeImageViewer = function () {
   document.getElementById('image-viewer-modal').style.display = 'none';
 };
 
-/**
- * Close image viewer when clicking outside the image
- */
-window.closeImageViewerOnOutsideClick = function(event) {
-  // Only close if clicking the modal background, not the image itself
+window.closeImageViewerOnOutsideClick = function (event) {
   if (event.target.id === 'image-viewer-modal') {
     closeImageViewer();
   }
-
 };

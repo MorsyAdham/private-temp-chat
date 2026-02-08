@@ -5,16 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Private Chat Room</title>
-    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
-
     <!-- WRAPPER -->
     <div class="wrapper">
-
         <!-- LOGIN SCREEN (VISIBLE BY DEFAULT) -->
         <div id="login" class="container">
             <h2>Login to Chat</h2>
@@ -22,61 +19,74 @@
             <input type="password" id="password" placeholder="Password">
             <button onclick="login()">Login</button>
         </div>
-
         <!-- CHAT SCREEN (HIDDEN BY DEFAULT) -->
         <div id="chat" class="container" style="display: none;">
             <div class="header">
+                <button id="reload-btn" class="reload-btn" onclick="reloadChat()" title="Reload chat">🔄</button>
+                <button id="search-btn" class="search-btn" onclick="toggleSearch()" title="Search messages">🔍</button>
                 <h2>Our Room</h2>
                 <button id="panic-btn" class="panic-btn" onclick="panic()">Panic</button>
             </div>
+
+            <!-- Search Bar (hidden by default) -->
+            <div id="search-bar" class="search-bar" style="display: none;">
+                <input type="text" id="search-input" placeholder="Search messages..." onkeyup="searchMessages()">
+                <button onclick="searchPrevious()" title="Previous result">⬆️</button>
+                <button onclick="searchNext()" title="Next result">⬇️</button>
+                <button onclick="closeSearch()" class="close-search-btn">✕</button>
+            </div>
+
             <div id="connection-status">🔴 Disconnected</div>
 
+            <div id="floating-date">Today</div>
             <!-- Chat messages container with load button inside -->
             <div id="messages">
                 <!-- Load more button inside messages box -->
-                <button id="load-more-btn" class="load-more-btn" onclick="loadOlderMessages()">
+                <button id="load-more-btn" onclick="loadOlderMessages()">
                     Load older messages
                 </button>
+
+                <button id="load-all-btn" onclick="loadAllMessages()">
+                    Load all messages
+                </button>
             </div>
-            
+            <div id="jump-bottom-btn" onclick="scrollToBottom(true)">⬇</div>
+
             <div class="input-area">
                 <textarea id="msg" placeholder="Type your message..." rows="1"></textarea>
-                
+
                 <!-- Camera button -->
                 <button class="camera-btn" onclick="openImagePicker()" title="Send photo">
                     📷
                 </button>
-                
+
                 <button onclick="send()">Send</button>
             </div>
         </div>
-
     </div>
-
     <!-- Hidden file input for image selection -->
     <input type="file" id="image-input" accept="image/*" style="display: none;" onchange="handleImageSelect(event)">
-    
-    <!-- Hidden camera input for taking photos -->
-    <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;" onchange="handleImageSelect(event)">
 
+    <!-- Hidden camera input for taking photos -->
+    <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;"
+        onchange="handleImageSelect(event)">
     <!-- Image Preview Modal -->
     <div id="image-preview-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3>Send Photo</h3>
             <img id="preview-image" src="" alt="Preview">
-            
+
             <label class="view-once-toggle">
                 <input type="checkbox" id="view-once-checkbox">
                 <span>🔒 View once</span>
             </label>
-            
+
             <div class="modal-buttons">
                 <button onclick="cancelImageSend()" class="cancel-btn">Cancel</button>
                 <button onclick="confirmImageSend()" class="send-btn">Send</button>
             </div>
         </div>
     </div>
-
     <!-- Image Viewer Modal -->
     <div id="image-viewer-modal" class="modal" style="display: none;" onclick="closeImageViewerOnOutsideClick(event)">
         <div class="modal-content image-viewer">
@@ -85,7 +95,6 @@
             <div id="viewer-info"></div>
         </div>
     </div>
-
     <!-- Image Picker Modal -->
     <div id="image-picker-modal" class="modal" style="display: none;">
         <div class="modal-content picker">
@@ -95,7 +104,6 @@
             <button onclick="closeImagePicker()" class="cancel-btn">Cancel</button>
         </div>
     </div>
-
     <script src="app.js"></script>
 </body>
 
