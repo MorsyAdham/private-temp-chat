@@ -3,24 +3,24 @@
 // ============================================================================
 
 const CONFIG = {
-  supabase: {
-    url: "https://twvwusthqhxnmghcnbjk.supabase.co",
-    key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3dnd1c3RocWh4bm1naGNuYmprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMzUwMTAsImV4cCI6MjA4MTkxMTAxMH0.zPw0OH5TaWCM_SLGQYpUAp00mVZwamR13KPDs_HRb7s"
-  },
-  telegram: {
-    botToken: "8551799267:AAF3DHlffeUhTCWYV5J5c0AoYRbDmfNkodo",
-    chatId: "5637769598"
-  },
-  pagination: {
-    initialLoad: 200,
-    pageSize: 200
-  }
+    supabase: {
+        url: "https://twvwusthqhxnmghcnbjk.supabase.co",
+        key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3dnd1c3RocWh4bm1naGNuYmprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMzUwMTAsImV4cCI6MjA4MTkxMTAxMH0.zPw0OH5TaWCM_SLGQYpUAp00mVZwamR13KPDs_HRb7s"
+    },
+    telegram: {
+        botToken: "8551799267:AAF3DHlffeUhTCWYV5J5c0AoYRbDmfNkodo",
+        chatId: "5637769598"
+    },
+    pagination: {
+        initialLoad: 200,
+        pageSize: 200
+    }
 };
 
 const USER_NAMES = {
-  "adhammorsy2311@gmail.com": "Nobody",
-  "ayaessam487@gmail.com": "My Love",
-  "joboffers540@gmail.com": "JobOffers"
+    "adhammorsy2311@gmail.com": "Nobody",
+    "ayaessam487@gmail.com": "My Love",
+    "joboffers540@gmail.com": "JobOffers"
 };
 
 const ALLOWED_EMAILS = Object.keys(USER_NAMES);
@@ -30,1375 +30,1624 @@ const ALLOWED_EMAILS = Object.keys(USER_NAMES);
 // ============================================================================
 
 const state = {
-  supabaseClient: null,
-  channel: null,
-  currentUserEmail: "",
-  oldestMessageTimestamp: null,
-  isLoadingOlderMessages: false,
-  hasMoreMessages: true,
-  unreadMessages: new Set(),
-  isAtBottom: true,
-  selectedImageFile: null,
-  selectedImageDataUrl: null,
-  searchResults: [],
-  currentSearchIndex: -1,
-  allMessages: [], // Store all loaded messages for search
-  renderedDates: new Set(),
+    supabaseClient: null,
+    channel: null,
+    currentUserEmail: "",
+    oldestMessageTimestamp: null,
+    isLoadingOlderMessages: false,
+    hasMoreMessages: true,
+    unreadMessages: new Set(),
+    isAtBottom: true,
+    selectedImages: [],        // array of { file, dataUrl }
+    selectedVideo: null,       // single File object
+    searchResults: [],
+    currentSearchIndex: -1,
+    allMessages: [],
+    replyToMessage: null,
+    voiceRecorder: null,
+    voiceRecordingStartTime: null,
+    voiceRecordingInterval: null,
+    voiceBlob: null
 };
 
 // ============================================================================
-// INITIALIZATION
+// INITIALIZATION & AUTHENTICATION
 // ============================================================================
 
 function initializeApp() {
-  state.supabaseClient = window.supabase.createClient(
-    CONFIG.supabase.url,
-    CONFIG.supabase.key
-  );
+    state.supabaseClient = window.supabase.createClient(
+        CONFIG.supabase.url,
+        CONFIG.supabase.key
+    );
 }
 
-// ============================================================================
-// AUTHENTICATION
-// ============================================================================
-
 window.login = async function () {
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value;
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
 
-  if (!email || !password) {
-    showAlert("Please enter both email and password");
-    return;
-  }
-
-  try {
-    const { data, error } = await state.supabaseClient.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error) throw error;
-
-    if (!ALLOWED_EMAILS.includes(data.user.email)) {
-      await state.supabaseClient.auth.signOut();
-      showAlert("Access denied. You are not authorized to use this chat.");
-      return;
+    if (!email || !password) {
+        showAlert("Please enter both email and password");
+        return;
     }
 
-    state.currentUserEmail = data.user.email;
+    try {
+        const { data, error } = await state.supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
 
-    await requestNotificationPermission();
-    showChatScreen();
-    await updatePresence(true);
+        if (!ALLOWED_EMAILS.includes(data.user.email)) {
+            await state.supabaseClient.auth.signOut();
+            showAlert("Access denied");
+            return;
+        }
 
-    if (state.currentUserEmail === "ayaessam487@gmail.com") {
-      await sendTelegramNotification("My Love just logged in! 💕");
+        state.currentUserEmail = data.user.email;
+        await requestNotificationPermission();
+        showChatScreen();
+        await updatePresence(true);
+
+        if (state.currentUserEmail === "ayaessam487@gmail.com") {
+            await sendTelegramNotification("My Love just logged in! 💕");
+        }
+
+        await initializeChat();
+
+    } catch (error) {
+        console.error("Login error:", error);
+        showAlert("Login failed: " + error.message);
     }
-
-    await initializeChat();
-
-  } catch (error) {
-    console.error("Login error:", error);
-    showAlert("Login failed: " + error.message);
-  }
 };
 
 async function requestNotificationPermission() {
-  if ("Notification" in window && Notification.permission === "default") {
-    await Notification.requestPermission();
-  }
+    if ("Notification" in window && Notification.permission === "default") {
+        await Notification.requestPermission();
+    }
 }
 
 async function updatePresence(isOnline) {
-  try {
-    await state.supabaseClient.from("presence").upsert({
-      email: state.currentUserEmail,
-      online: isOnline,
-      last_seen: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error("Error updating presence:", error);
-  }
+    try {
+        await state.supabaseClient.from("presence").upsert({
+            email: state.currentUserEmail,
+            online: isOnline,
+            last_seen: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error("Error updating presence:", error);
+    }
 }
 
 // ============================================================================
-// CHAT INITIALIZATION
+// PART 2 — UTILITY FUNCTIONS
 // ============================================================================
 
 function getDateLabel(timestamp) {
-  const date = new Date(timestamp);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
 
-  if (date.toDateString() === today.toDateString()) return "Today";
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-
-  return date.toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  });
+    if (date.toDateString() === today.toDateString()) return "Today";
+    if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 }
-
-async function loadAllMessagesFromDB() {
-  const PAGE_SIZE = 1000;
-  let allMessages = [];
-  let from = 0;
-  let to = PAGE_SIZE - 1;
-
-  while (true) {
-    const { data, error } = await state.supabaseClient
-      .from("chat_messages")
-      .select("*")
-      .order("created_at", { ascending: true })
-      .range(from, to);
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) break;
-
-    allMessages = allMessages.concat(data);
-
-    // Stop if less than page size → no more data
-    if (data.length < PAGE_SIZE) break;
-
-    from += PAGE_SIZE;
-    to += PAGE_SIZE;
-  }
-
-  return allMessages;
-}
-
-async function initializeChat() {
-  updateConnectionStatus("🔄 Loading messages...");
-
-  try {
-    await loadInitialMessages();
-    await setupRealtimeSubscription();
-    setupReadReceiptListener();
-    setupScrollHandler();
-    updateConnectionStatus("🟢 Connected");
-
-  } catch (error) {
-    console.error("Chat initialization error:", error);
-    updateConnectionStatus("🔴 Connection failed");
-    showAlert("Failed to connect to chat. Please refresh the page.");
-  }
-}
-
-// ✅ FIX #1: Properly order messages by timestamp
-async function loadInitialMessages() {
-  try {
-    const { data, error } = await state.supabaseClient
-      .from("chat_messages")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(CONFIG.pagination.initialLoad);
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) return;
-
-    // Reverse to chronological order
-    const messages = sortMessagesByTime(data);
-
-    state.oldestMessageTimestamp = messages[0].created_at;
-    state.allMessages = messages.slice();
-
-    messages.forEach(msg => renderMessage(msg));
-
-    scrollToBottom(false);
-    await markVisibleMessagesAsRead();
-
-  } catch (error) {
-    console.error("Initial load failed:", error);
-    throw error;
-  }
-}
-
-// ✅ FIX #2: Reload chat function
-window.reloadChat = async function () {
-  updateConnectionStatus("🔄 Reloading...");
-
-  try {
-    // Unsubscribe from current channel
-    if (state.channel) {
-      await state.channel.unsubscribe();
-      state.channel = null;
-    }
-
-    // Clear current messages
-    const messagesDiv = document.getElementById("messages");
-    const loadButton = document.getElementById("load-more-btn");
-    messagesDiv.innerHTML = "";
-    messagesDiv.appendChild(loadButton);
-
-    // Reset state
-    state.oldestMessageTimestamp = null;
-    state.hasMoreMessages = true;
-    state.unreadMessages.clear();
-    state.allMessages = [];
-
-    // Reload everything
-    await loadInitialMessages();
-    await setupRealtimeSubscription();
-
-    updateConnectionStatus("🟢 Connected");
-    showAlert("Chat reloaded successfully!");
-
-  } catch (error) {
-    console.error("Reload error:", error);
-    updateConnectionStatus("🔴 Reload failed");
-    showAlert("Failed to reload chat. Please try again.");
-  }
-};
-
-window.loadOlderMessages = async function () {
-  if (state.isLoadingOlderMessages || !state.hasMoreMessages) return;
-
-  state.isLoadingOlderMessages = true;
-  const loadButton = document.getElementById("load-more-btn");
-  loadButton.textContent = "Loading...";
-
-  try {
-    const { data, error } = await state.supabaseClient
-      .from("chat_messages")
-      .select("*")
-      .lt("created_at", state.oldestMessageTimestamp)
-      .order("created_at", { ascending: false })
-      .limit(CONFIG.pagination.pageSize);
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      state.hasMoreMessages = false;
-      updateLoadMoreButton();
-      return;
-    }
-
-    const messagesDiv = document.getElementById("messages");
-    const oldScrollHeight = messagesDiv.scrollHeight;
-
-    // Normalize order (old → new)
-    const newMessages = sortMessagesByTime(data);
-
-    // Filter out duplicates (CRITICAL)
-    const trulyNewMessages = newMessages.filter(
-      msg => !state.allMessages.some(m => m.id === msg.id)
-    );
-
-    if (trulyNewMessages.length === 0) {
-      updateLoadMoreButton();
-      return;
-    }
-
-    // Update cursor BEFORE render
-    state.oldestMessageTimestamp = trulyNewMessages[0].created_at;
-
-    // Merge ONCE and sort ONCE
-    state.allMessages = sortMessagesByTime([
-      ...trulyNewMessages,
-      ...state.allMessages
-    ]);
-
-    // Render ONLY new messages (prepend)
-    // Remove ALL message bubbles (not the button)
-    const loadButton = document.getElementById("load-more-btn");
-
-    messagesDiv.querySelectorAll(".message-bubble").forEach(b => b.remove());
-
-    // Re-render EVERYTHING from state (guaranteed order)
-    state.allMessages.forEach(msg => renderMessage(msg, false));
-
-    // Restore scroll position
-    messagesDiv.scrollTop =
-      messagesDiv.scrollHeight - oldScrollHeight;
-
-
-    // Maintain scroll position
-    messagesDiv.scrollTop =
-      messagesDiv.scrollHeight - oldScrollHeight;
-
-    state.hasMoreMessages = data.length === CONFIG.pagination.pageSize;
-    updateLoadMoreButton();
-
-  } catch (error) {
-    console.error("Load older messages failed:", error);
-    showAlert("Failed to load older messages");
-  } finally {
-    state.isLoadingOlderMessages = false;
-  }
-};
-
-window.loadAllMessages = async function () {
-  if (state.isLoadingOlderMessages) return;
-
-  const loadAllBtn = document.getElementById("load-all-btn");
-  const loadMoreBtn = document.getElementById("load-more-btn");
-
-  state.isLoadingOlderMessages = true;
-  loadAllBtn.textContent = "Loading all...";
-  loadAllBtn.disabled = true;
-
-  try {
-    updateConnectionStatus("🔄 Loading all messages...");
-
-    // 1️⃣ Fetch everything
-    const allMessages = await loadAllMessagesFromDB();
-
-    if (!allMessages || allMessages.length === 0) return;
-
-    // 2️⃣ Sort once
-    const sortedMessages = sortMessagesByTime(allMessages);
-
-    // 3️⃣ Reset state
-    state.allMessages = sortedMessages;
-    state.oldestMessageTimestamp = sortedMessages[0].created_at;
-    state.hasMoreMessages = false;
-
-    // 4️⃣ Clear UI (keep buttons)
-    const messagesDiv = document.getElementById("messages");
-    messagesDiv
-      .querySelectorAll(".message-bubble")
-      .forEach(b => b.remove());
-
-    // 5️⃣ Render everything
-    sortedMessages.forEach(msg => renderMessage(msg, false));
-
-    scrollToBottom(false);
-
-    // 6️⃣ Disable pagination buttons
-    loadMoreBtn.textContent = "All messages loaded";
-    loadMoreBtn.disabled = true;
-    loadAllBtn.textContent = "All messages loaded";
-
-    updateConnectionStatus("🟢 All messages loaded");
-
-  } catch (error) {
-    console.error("Load all messages failed:", error);
-    showAlert("Failed to load all messages");
-    loadAllBtn.textContent = "Load all messages";
-    loadAllBtn.disabled = false;
-  } finally {
-    state.isLoadingOlderMessages = false;
-  }
-};
-
-function updateLoadMoreButton() {
-  const loadButton = document.getElementById("load-more-btn");
-  const loadAllBtn = document.getElementById("load-all-btn");
-  if (!loadButton) return;
-
-  if (state.hasMoreMessages) {
-    loadButton.textContent = "Load older messages";
-    loadButton.disabled = false;
-    if (loadAllBtn) loadAllBtn.disabled = false;
-  } else {
-    loadButton.textContent = "No more messages";
-    loadButton.disabled = true;
-    if (loadAllBtn) loadAllBtn.disabled = true;
-  }
-}
-
-
-function setupScrollHandler() {
-  const messagesDiv = document.getElementById("messages");
-  const jumpBtn = document.getElementById("jump-bottom-btn");
-
-  messagesDiv.addEventListener("scroll", () => {
-    const atBottom =
-      messagesDiv.scrollHeight - messagesDiv.scrollTop <=
-      messagesDiv.clientHeight + 50;
-
-    state.isAtBottom = atBottom;
-
-    if (jumpBtn) {
-      jumpBtn.style.display = atBottom ? "none" : "flex";
-    }
-
-    if (atBottom) {
-      markVisibleMessagesAsRead();
-    }
-  });
-
-  const loadBtn = document.getElementById("load-more-btn");
-
-  messagesDiv.addEventListener("scroll", () => {
-    const atTop = messagesDiv.scrollTop <= 30;
-    const atBottom =
-      messagesDiv.scrollHeight - messagesDiv.scrollTop <=
-      messagesDiv.clientHeight + 50;
-
-    state.isAtBottom = atBottom;
-
-    // Jump button
-    jumpBtn.style.display = atBottom ? "none" : "flex";
-
-    // Load more button
-    loadBtn.style.display =
-      atTop && state.hasMoreMessages ? "block" : "none";
-
-    if (atBottom) {
-      markVisibleMessagesAsRead();
-    }
-    updateFloatingDate();
-
-  });
-}
-
-// ============================================================================
-// REALTIME SUBSCRIPTION  
-// ============================================================================
-
-async function setupRealtimeSubscription() {
-  state.channel = state.supabaseClient.channel("private-room", {
-    config: { broadcast: { self: false } }
-  });
-
-  state.channel.on("broadcast", { event: "new-message" }, async (payload) => {
-    const message = payload.payload;
-    if (!message || !message.id) return;
-
-    // Check if we need a date separator
-    const lastMsg = state.allMessages[state.allMessages.length - 1];
-    if (lastMsg) {
-      const lastDate = new Date(lastMsg.created_at).toDateString();
-      const newDate = new Date(message.created_at).toDateString();
-    }
-
-    // Ignore duplicates
-    if (state.allMessages.some(m => m.id === message.id)) return;
-
-    // Insert → sort
-    state.allMessages.push(message);
-    sortMessagesByTime(state.allMessages);
-
-    // Render only if it belongs at the end
-    const lastRendered =
-      document.querySelector(".message-bubble:last-of-type");
-
-    const lastTimestamp = lastRendered
-      ? new Date(lastRendered.dataset.timestamp)
-      : null;
-
-    if (!lastTimestamp || new Date(message.created_at) >= lastTimestamp) {
-      renderMessage(message, false);
-
-      if (state.isAtBottom) {
-        scrollToBottom(true);
-      }
-    }
-
-    if (state.isAtBottom) {
-      scrollToBottom(true);
-    }
-
-    if (message.sender !== state.currentUserEmail) {
-      if (state.isAtBottom) {
-        await markMessageAsRead(message.id);
-      }
-
-      showNotification(USER_NAMES[message.sender] || message.sender, message.text || "Sent a photo");
-
-      if (message.sender === "ayaessam487@gmail.com") {
-        const messageContent = message.message_type === 'image' ? 'a photo' : message.text;
-        await sendTelegramNotification(`My Love sent ${messageContent}`);
-      }
-    }
-  });
-
-  state.channel.on("broadcast", { event: "image-viewed" }, async (payload) => {
-    const { messageId } = payload.payload;
-
-    const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
-    if (messageElement) {
-      const imageContainer = messageElement.querySelector('.message-image-container');
-      if (imageContainer) {
-        imageContainer.innerHTML = '<div class="image-viewed-overlay">📷 Opened</div>';
-      }
-    }
-  });
-
-  state.channel.on("postgres_changes", {
-    event: "INSERT",
-    schema: "public",
-    table: "chat_messages"
-  }, async (payload) => {
-    const message = payload.new;
-    if (message.sender === state.currentUserEmail) return;
-
-    const lastMsg = state.allMessages[state.allMessages.length - 1];
-    if (lastMsg) {
-      const lastDate = new Date(lastMsg.created_at).toDateString();
-      const newDate = new Date(message.created_at).toDateString();
-    }
-
-    // Ignore duplicates
-    if (state.allMessages.some(m => m.id === message.id)) return;
-
-    // Insert → sort
-    state.allMessages.push(message);
-    sortMessagesByTime(state.allMessages);
-
-    // Render only if it belongs at the end
-    const lastRendered =
-      document.querySelector(".message-bubble:last-of-type");
-
-    const lastTimestamp = lastRendered
-      ? new Date(lastRendered.dataset.timestamp)
-      : null;
-
-    if (!lastTimestamp || new Date(message.created_at) >= lastTimestamp) {
-      renderMessage(message, false);
-
-      if (state.isAtBottom) {
-        scrollToBottom(true);
-      }
-    }
-
-    if (state.isAtBottom) {
-      scrollToBottom(true);
-      await markMessageAsRead(message.id);
-    }
-
-    showNotification(USER_NAMES[message.sender] || message.sender, message.text || "Sent a photo");
-
-    if (message.sender === "ayaessam487@gmail.com") {
-      const messageContent = message.message_type === 'image' ? 'a photo' : message.text;
-      await sendTelegramNotification(`My Love sent ${messageContent}`);
-    }
-  });
-
-  await state.channel.subscribe((status) => {
-    if (status === "SUBSCRIBED") {
-      updateConnectionStatus("🟢 Connected");
-    } else if (status === "CLOSED") {
-      updateConnectionStatus("🔴 Disconnected");
-    } else if (status === "CHANNEL_ERROR") {
-      updateConnectionStatus("🔴 Connection error");
-    }
-  });
-}
-
-function setupReadReceiptListener() {
-  state.supabaseClient
-    .channel("read-receipts")
-    .on("postgres_changes", {
-      event: "UPDATE",
-      schema: "public",
-      table: "chat_messages",
-      filter: `sender=eq.${state.currentUserEmail}`
-    }, (payload) => {
-      if (payload.new.read) {
-        updateMessageReadReceipt(payload.new.id, true);
-      }
-    })
-    .subscribe();
-}
-
-// ============================================================================
-// SEARCH FUNCTIONALITY
-// ============================================================================
-
-window.toggleSearch = function () {
-  const searchBar = document.getElementById("search-bar");
-  const searchInput = document.getElementById("search-input");
-
-  if (searchBar.style.display === "none") {
-    searchBar.style.display = "flex";
-    searchInput.focus();
-  } else {
-    closeSearch();
-  }
-};
-
-window.closeSearch = function () {
-  const searchBar = document.getElementById("search-bar");
-  const searchInput = document.getElementById("search-input");
-
-  searchBar.style.display = "none";
-  searchInput.value = "";
-
-  // Remove all highlights
-  document.querySelectorAll(".message-bubble.highlight").forEach(el => {
-    el.classList.remove("highlight");
-  });
-
-  state.searchResults = [];
-  state.currentSearchIndex = -1;
-};
-
-window.searchMessages = function () {
-  const searchInput = document.getElementById("search-input");
-  const query = searchInput.value.trim().toLowerCase();
-
-  // Remove previous highlights
-  document.querySelectorAll(".message-bubble.highlight").forEach(el => {
-    el.classList.remove("highlight");
-  });
-
-  if (!query) {
-    state.searchResults = [];
-    state.currentSearchIndex = -1;
-    return;
-  }
-
-  // Search in all messages
-  state.searchResults = state.allMessages.filter(msg => {
-    if (msg.message_type === 'image') return false;
-    return msg.text && msg.text.toLowerCase().includes(query);
-  });
-
-  if (state.searchResults.length > 0) {
-    state.currentSearchIndex = 0;
-    highlightAndScrollToResult(state.searchResults[0].id);
-  }
-};
-
-function highlightAndScrollToResult(messageId) {
-  // Remove previous highlight
-  document
-    .querySelectorAll(".message-bubble.highlight")
-    .forEach(el => el.classList.remove("highlight"));
-
-  const messageElement =
-    document.querySelector(`[data-message-id="${messageId}"]`);
-
-  if (messageElement) {
-    messageElement.classList.add("highlight");
-
-    messageElement.scrollIntoView({
-      behavior: "smooth",
-      block: "center"
-    });
-  }
-}
-
-window.searchNext = function () {
-  if (!state.searchResults.length) return;
-
-  state.currentSearchIndex =
-    (state.currentSearchIndex + 1) % state.searchResults.length;
-
-  const message = state.searchResults[state.currentSearchIndex];
-  highlightAndScrollToResult(message.id);
-};
-
-window.searchPrevious = function () {
-  if (!state.searchResults.length) return;
-
-  state.currentSearchIndex =
-    (state.currentSearchIndex - 1 + state.searchResults.length) %
-    state.searchResults.length;
-
-  const message = state.searchResults[state.currentSearchIndex];
-  highlightAndScrollToResult(message.id);
-};
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
 
 function sortMessagesByTime(messages) {
-  return messages.sort(
-    (a, b) => new Date(a.created_at) - new Date(b.created_at)
-  );
+    return messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 }
 
 function isArabic(text) {
-  const arabicChars = (text.match(/[\u0600-\u06FF\u0750-\u077F]/g) || []).length;
-  const totalChars = text.replace(/\s/g, '').length;
-  return totalChars > 0 && (arabicChars / totalChars) > 0.3;
+    const arabicChars = (text.match(/[\u0600-\u06FF\u0750-\u077F]/g) || []).length;
+    const totalChars = text.replace(/\s/g, "").length;
+    return totalChars > 0 && arabicChars / totalChars > 0.3;
 }
 
 function autoResizeTextarea(textarea) {
-  textarea.style.height = 'auto';
-  textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    textarea.style.height = "auto";
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + "px";
+}
+
+function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.appendChild(document.createTextNode(str || ""));
+    return d.innerHTML;
+}
+
+function getDomain(url) {
+    try { return new URL(url).hostname.replace("www.", ""); }
+    catch { return url; }
+}
+
+function hasLinks(text) {
+    return /(https?:\/\/[^\s]+)/.test(text || "");
+}
+
+function extractFirstLink(text) {
+    const m = (text || "").match(/(https?:\/\/[^\s]+)/);
+    return m ? m[1] : null;
+}
+
+// Renders text into a container, turning URLs into clickable <a> tags
+function renderTextWithLinks(container, text) {
+    const parts = (text || "").split(/(https?:\/\/[^\s]+)/g);
+    parts.forEach((part, i) => {
+        if (i % 2 === 1) {
+            const a = document.createElement("a");
+            a.href = part;
+            a.textContent = part;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            container.appendChild(a);
+        } else if (part) {
+            container.appendChild(document.createTextNode(part));
+        }
+    });
 }
 
 // ============================================================================
-// SEND MESSAGE
+// PART 2 — CHAT INITIALIZATION
 // ============================================================================
 
-window.send = async function () {
-  const textarea = document.getElementById("msg");
-  const text = textarea.value.trim();
-
-  if (!text || !state.channel) {
-    return;
-  }
-
-  try {
-    const { data, error } = await state.supabaseClient
-      .from("chat_messages")
-      .insert([{
-        sender: state.currentUserEmail,
-        text: text,
-        read: false
-      }])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Check if we need date separator
-    const lastMsg = state.allMessages[state.allMessages.length - 1];
-    if (lastMsg) {
-      const lastDate = new Date(lastMsg.created_at).toDateString();
-      const newDate = new Date(data.created_at).toDateString();
+async function initializeChat() {
+    updateConnectionStatus("loading");
+    try {
+        await loadInitialMessages();
+        await setupRealtimeSubscription();
+        setupReadReceiptListener();
+        setupScrollHandler();
+        updateConnectionStatus("connected");
+    } catch (error) {
+        console.error("Chat initialization error:", error);
+        updateConnectionStatus("disconnected");
+        showAlert("Failed to connect to chat");
     }
+}
 
-    if (!state.allMessages.some(m => m.id === data.id)) {
-      state.allMessages.push(data);
-      sortMessagesByTime(state.allMessages);
-      renderMessage(data, false);
+async function loadInitialMessages() {
+    try {
+        const { data, error } = await state.supabaseClient
+            .from("chat_messages")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(CONFIG.pagination.initialLoad);
+
+        if (error) throw error;
+        if (!data || data.length === 0) return;
+
+        // Reverse so messages render oldest → newest
+        const messages = data.reverse();
+
+        state.allMessages = messages.slice();
+        state.oldestMessageTimestamp = messages[0].created_at;
+
+        data.forEach(msg => renderMessage(msg));
+        scrollToBottom(false);
+        await markVisibleMessagesAsRead();
+    } catch (error) {
+        console.error("Initial load failed:", error);
+        throw error;
     }
+}
 
-    scrollToBottom(true);
+window.reloadChat = async function () {
+    updateConnectionStatus("loading");
+    try {
+        if (state.channel) { await state.channel.unsubscribe(); state.channel = null; }
 
-    await state.channel.send({
-      type: "broadcast",
-      event: "new-message",
-      payload: data
-    });
+        const messagesDiv = document.getElementById("messages");
+        messagesDiv.innerHTML = "";
 
-    if (state.currentUserEmail === "ayaessam487@gmail.com") {
-      await sendTelegramNotification(`My Love sent: ${text}`);
+        const loadMoreBtn = document.createElement("button");
+        loadMoreBtn.id = "load-more-btn";
+        loadMoreBtn.className = "load-btn";
+        loadMoreBtn.onclick = loadOlderMessages;
+        loadMoreBtn.innerHTML = '<span class="material-icons">expand_less</span> Load older messages';
+
+        const loadAllBtn = document.createElement("button");
+        loadAllBtn.id = "load-all-btn";
+        loadAllBtn.className = "load-btn";
+        loadAllBtn.onclick = loadAllMessages;
+        loadAllBtn.innerHTML = '<span class="material-icons">history</span> Load all messages';
+
+        messagesDiv.appendChild(loadMoreBtn);
+        messagesDiv.appendChild(loadAllBtn);
+
+        state.oldestMessageTimestamp = null;
+        state.hasMoreMessages = true;
+        state.unreadMessages.clear();
+        state.allMessages = [];
+
+        await loadInitialMessages();
+        await setupRealtimeSubscription();
+        updateConnectionStatus("connected");
+        showAlert("Chat reloaded successfully!");
+    } catch (error) {
+        console.error("Reload error:", error);
+        updateConnectionStatus("disconnected");
+        showAlert("Failed to reload chat");
     }
-
-    textarea.value = "";
-    textarea.style.height = '40px';
-    textarea.style.direction = 'ltr';
-    textarea.style.textAlign = 'left';
-
-  } catch (error) {
-    console.error("Error sending message:", error);
-    showAlert("Failed to send message. Please try again.");
-  }
 };
 
 // ============================================================================
-// MESSAGE RENDERING
+// PART 2 — PAGINATION
 // ============================================================================
 
+async function loadAllMessagesFromDB() {
+    const PAGE_SIZE = 1000;
+    let all = [];
+    let from = 0;
+    while (true) {
+        const { data, error } = await state.supabaseClient
+            .from("chat_messages")
+            .select("*")
+            .order("created_at", { ascending: true })
+            .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all = all.concat(data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+    }
+    return all;
+}
+
+window.loadOlderMessages = async function () {
+    if (state.isLoadingOlderMessages || !state.hasMoreMessages) return;
+    state.isLoadingOlderMessages = true;
+    const loadBtn = document.getElementById("load-more-btn");
+    if (loadBtn) loadBtn.textContent = "Loading...";
+
+    try {
+        const { data, error } = await state.supabaseClient
+            .from("chat_messages")
+            .select("*")
+            .lt("created_at", state.oldestMessageTimestamp)
+            .order("created_at", { ascending: false })
+            .limit(CONFIG.pagination.pageSize);
+
+        if (error) throw error;
+        if (!data || data.length === 0) { state.hasMoreMessages = false; updateLoadMoreButton(); return; }
+
+        const messagesDiv = document.getElementById("messages");
+        const oldScrollHeight = messagesDiv.scrollHeight;
+
+        const newMessages = data.reverse();
+        const trulyNew = newMessages.filter(m => !state.allMessages.some(e => e.id === m.id));
+        if (!trulyNew.length) { updateLoadMoreButton(); return; }
+
+        state.oldestMessageTimestamp = trulyNew[0].created_at;
+        state.allMessages = sortMessagesByTime([...trulyNew, ...state.allMessages]);
+
+        // Full re-render to ensure correct date separators
+        messagesDiv.querySelectorAll(".message-bubble, .date-separator").forEach(el => el.remove());
+        state.allMessages.forEach(msg => renderMessage(msg, false));
+
+        messagesDiv.scrollTop = messagesDiv.scrollHeight - oldScrollHeight;
+        state.hasMoreMessages = data.length === CONFIG.pagination.pageSize;
+        updateLoadMoreButton();
+    } catch (error) {
+        console.error("Load older failed:", error);
+        showAlert("Failed to load older messages");
+    } finally {
+        state.isLoadingOlderMessages = false;
+    }
+};
+
+window.loadAllMessages = async function () {
+    if (state.isLoadingOlderMessages) return;
+    const loadAllBtn = document.getElementById("load-all-btn");
+    const loadMoreBtn = document.getElementById("load-more-btn");
+    state.isLoadingOlderMessages = true;
+    if (loadAllBtn) { loadAllBtn.textContent = "Loading all..."; loadAllBtn.disabled = true; }
+
+    try {
+        updateConnectionStatus("loading");
+        const all = await loadAllMessagesFromDB();
+        if (!all || !all.length) return;
+
+        state.allMessages = all;
+        state.oldestMessageTimestamp = all[0].created_at;
+        state.hasMoreMessages = false;
+
+        const messagesDiv = document.getElementById("messages");
+        messagesDiv.querySelectorAll(".message-bubble, .date-separator").forEach(el => el.remove());
+        state.allMessages.forEach(msg => renderMessage(msg, false));
+        scrollToBottom(false);
+
+        if (loadMoreBtn) { loadMoreBtn.textContent = "All messages loaded"; loadMoreBtn.disabled = true; }
+        if (loadAllBtn) { loadAllBtn.textContent = "All messages loaded"; }
+        updateConnectionStatus("connected");
+    } catch (error) {
+        console.error("Load all failed:", error);
+        showAlert("Failed to load all messages");
+        if (loadAllBtn) { loadAllBtn.textContent = "Load all messages"; loadAllBtn.disabled = false; }
+    } finally {
+        state.isLoadingOlderMessages = false;
+    }
+};
+
+function updateLoadMoreButton() {
+    const loadBtn = document.getElementById("load-more-btn");
+    const loadAllBtn = document.getElementById("load-all-btn");
+    if (!loadBtn) return;
+    if (state.hasMoreMessages) {
+        loadBtn.innerHTML = '<span class="material-icons">expand_less</span> Load older messages';
+        loadBtn.disabled = false;
+        if (loadAllBtn) loadAllBtn.disabled = false;
+    } else {
+        loadBtn.textContent = "No more messages";
+        loadBtn.disabled = true;
+        if (loadAllBtn) loadAllBtn.disabled = true;
+    }
+}
+
+function setupScrollHandler() {
+    const messagesDiv = document.getElementById("messages");
+    const jumpBtn = document.getElementById("jump-bottom-btn");
+
+    messagesDiv.addEventListener("scroll", () => {
+        const atBottom = messagesDiv.scrollHeight - messagesDiv.scrollTop <= messagesDiv.clientHeight + 50;
+        state.isAtBottom = atBottom;
+        if (jumpBtn) jumpBtn.style.display = atBottom ? "none" : "flex";
+        if (atBottom) markVisibleMessagesAsRead();
+        updateFloatingDate();
+    });
+}
+
+// ============================================================================
+// PART 2 — REALTIME SUBSCRIPTION
+// ============================================================================
+
+async function setupRealtimeSubscription() {
+    state.channel = state.supabaseClient.channel("private-room", {
+        config: { broadcast: { self: false } }
+    });
+
+    const handleNewMessage = async (message) => {
+        if (!message || !message.id) return;
+        if (state.allMessages.some(m => m.id === message.id)) return;
+
+        state.allMessages.push(message);
+        renderMessage(message, false);
+
+        if (state.isAtBottom) scrollToBottom(true);
+
+        if (message.sender !== state.currentUserEmail) {
+            if (state.isAtBottom) await markMessageAsRead(message.id);
+
+            const preview =
+                message.message_type === "image" ? "📷 Photo" :
+                    message.message_type === "video" ? "🎥 Video" :
+                        message.message_type === "voice" ? "🎤 Voice message" :
+                            (message.text || "Message");
+
+            showNotification(USER_NAMES[message.sender] || message.sender, preview);
+
+            if (message.sender === "ayaessam487@gmail.com") {
+                await sendTelegramNotification(`My Love sent ${preview}`);
+            }
+        }
+    };
+
+    state.channel.on("broadcast", { event: "new-message" }, (p) => handleNewMessage(p.payload));
+
+    state.channel.on("broadcast", { event: "image-viewed" }, (p) => {
+        const { messageId } = p.payload;
+        const el = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (el) {
+            const c = el.querySelector(".message-image-container");
+            if (c) {
+                c.innerHTML = '<div class="image-viewed-overlay"><span class="material-icons" style="font-size:18px">photo_camera</span> Opened</div>';
+                c.style.cssText = "width:200px;height:160px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;";
+            }
+        }
+    });
+
+    state.channel.on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (p) => {
+        if (p.new.sender !== state.currentUserEmail) handleNewMessage(p.new);
+    });
+
+    await state.channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") updateConnectionStatus("connected");
+        else if (status === "CLOSED" || status === "CHANNEL_ERROR") updateConnectionStatus("disconnected");
+    });
+}
+
+function setupReadReceiptListener() {
+    state.supabaseClient
+        .channel("read-receipts")
+        .on("postgres_changes", {
+            event: "UPDATE",
+            schema: "public",
+            table: "chat_messages",
+            filter: `sender=eq.${state.currentUserEmail}`
+        }, (p) => { if (p.new.read) updateMessageReadReceipt(p.new.id, true); })
+        .subscribe();
+}
+
+// ============================================================================
+// PART 2 — SEARCH
+// ============================================================================
+
+window.toggleSearch = function () {
+    const bar = document.getElementById("search-bar");
+    const input = document.getElementById("search-input");
+    if (bar.style.display === "none") { bar.style.display = "flex"; input.focus(); }
+    else closeSearch();
+};
+
+window.closeSearch = function () {
+    document.getElementById("search-bar").style.display = "none";
+    document.getElementById("search-input").value = "";
+    document.querySelectorAll(".message-bubble.highlight").forEach(el => el.classList.remove("highlight"));
+    state.searchResults = [];
+    state.currentSearchIndex = -1;
+};
+
+window.searchMessages = function () {
+    const query = document.getElementById("search-input").value.trim().toLowerCase();
+    document.querySelectorAll(".message-bubble.highlight").forEach(el => el.classList.remove("highlight"));
+    if (!query) { state.searchResults = []; state.currentSearchIndex = -1; return; }
+
+    state.searchResults = state.allMessages.filter(m =>
+        m.text && m.text.toLowerCase().includes(query)
+    );
+
+    if (state.searchResults.length > 0) {
+        state.currentSearchIndex = 0;
+        highlightAndScrollToResult(state.searchResults[0].id);
+    }
+};
+
+function highlightAndScrollToResult(messageId) {
+    document.querySelectorAll(".message-bubble.highlight").forEach(el => el.classList.remove("highlight"));
+    const el = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (el) { el.classList.add("highlight"); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
+}
+
+window.searchNext = function () {
+    if (!state.searchResults.length) return;
+    state.currentSearchIndex = (state.currentSearchIndex + 1) % state.searchResults.length;
+    highlightAndScrollToResult(state.searchResults[state.currentSearchIndex].id);
+};
+
+window.searchPrevious = function () {
+    if (!state.searchResults.length) return;
+    state.currentSearchIndex = (state.currentSearchIndex - 1 + state.searchResults.length) % state.searchResults.length;
+    highlightAndScrollToResult(state.searchResults[state.currentSearchIndex].id);
+};
+
+// ============================================================================
+// PART 2 — REPLY
+// ============================================================================
+
+window.setReply = function (messageId) {
+    const message = state.allMessages.find(m => m.id === messageId);
+    if (!message) return;
+
+    state.replyToMessage = message;
+
+    const previewEl = document.getElementById("reply-preview");
+    document.getElementById("reply-name").textContent = USER_NAMES[message.sender] || message.sender;
+    document.getElementById("reply-message").textContent =
+        message.message_type === "image" ? "📷 Photo" :
+            message.message_type === "video" ? "🎥 Video" :
+                message.message_type === "voice" ? "🎤 Voice message" :
+                    (message.text || "");
+
+    previewEl.style.display = "flex";
+    document.getElementById("msg").focus();
+};
+
+window.cancelReply = function () {
+    state.replyToMessage = null;
+    document.getElementById("reply-preview").style.display = "none";
+};
+
+// ============================================================================
+// PART 2 — SEND TEXT MESSAGE
+// ============================================================================
+
+window.send = async function () {
+    const textarea = document.getElementById("msg");
+    const text = textarea.value.trim();
+    if (!text || !state.channel) return;
+
+    try {
+        const msgData = {
+            sender: state.currentUserEmail,
+            text,
+            message_type: "text",
+            read: false
+        };
+
+        if (state.replyToMessage) {
+            msgData.reply_to_id = state.replyToMessage.id;
+            msgData.reply_to_sender = state.replyToMessage.sender;
+            msgData.reply_to_text =
+                state.replyToMessage.message_type === "image" ? "📷 Photo" :
+                    state.replyToMessage.message_type === "video" ? "🎥 Video" :
+                        state.replyToMessage.message_type === "voice" ? "🎤 Voice message" :
+                            state.replyToMessage.text;
+        }
+
+        const { data, error } = await state.supabaseClient
+            .from("chat_messages")
+            .insert([msgData])
+            .select()
+            .single();
+        if (error) throw error;
+
+        if (!state.allMessages.some(m => m.id === data.id)) {
+            state.allMessages.push(data);
+            renderMessage(data, false);
+        }
+
+        scrollToBottom(true);
+        await state.channel.send({ type: "broadcast", event: "new-message", payload: data });
+
+        if (state.currentUserEmail === "ayaessam487@gmail.com") {
+            await sendTelegramNotification(`My Love sent: ${text}`);
+        }
+
+        textarea.value = "";
+        textarea.style.height = "40px";
+        textarea.style.direction = "ltr";
+        textarea.style.textAlign = "left";
+        cancelReply();
+        updateSendVoiceToggle("");
+
+    } catch (error) {
+        console.error("Send error:", error);
+        showAlert("Failed to send message. Please try again.");
+    }
+};
+
+// ============================================================================
+// PART 3 — MESSAGE RENDERING
+// ============================================================================
+
+function getLastRenderedDateLabel() {
+    const messagesDiv = document.getElementById("messages");
+    const separators = messagesDiv.querySelectorAll(".date-separator");
+    if (!separators.length) return null;
+    return separators[separators.length - 1].dataset.date;
+}
+
 function renderMessage(message, prepend = false) {
-  const messagesDiv = document.getElementById("messages");
-  const isSender = message.sender === state.currentUserEmail;
-  const messageType = message.message_type || 'text';
+    const messagesDiv = document.getElementById("messages");
+    const isSender = message.sender === state.currentUserEmail;
+    const messageType = message.message_type || "text";
 
-  const existingMessage = document.querySelector(`[data-message-id="${message.id}"]`);
-  if (existingMessage) {
-    return;
-  }
+    // Skip duplicates
+    if (document.querySelector(`[data-message-id="${message.id}"]`)) return;
 
-  const bubble = document.createElement("div");
-  bubble.className = `message-bubble ${isSender ? "sender" : "receiver"}`;
-  if (messageType === 'image') {
-    bubble.classList.add('image-message');
-  }
-  bubble.dataset.messageId = message.id;
-  bubble.dataset.timestamp = message.created_at; // Store timestamp for date comparison
+    // --- Date separator ---
+    const dateLabel = getDateLabel(message.created_at);
+    if (!prepend) {
+        const lastDate = getLastRenderedDateLabel();
+        if (lastDate !== dateLabel) {
+            const sep = document.createElement("div");
+            sep.className = "date-separator";
+            sep.dataset.date = dateLabel;
+            const span = document.createElement("span");
+            span.textContent = dateLabel;
+            sep.appendChild(span);
+            messagesDiv.appendChild(sep);
+        }
+    }
 
-  if (!isSender) {
-    const nameDiv = document.createElement("div");
-    nameDiv.className = "sender-name";
-    nameDiv.textContent = USER_NAMES[message.sender] || "Unknown";
-    bubble.appendChild(nameDiv);
-  }
+    // --- Bubble ---
+    const bubble = document.createElement("div");
+    bubble.className = `message-bubble ${isSender ? "sender" : "receiver"}`;
+    if (messageType === "image") bubble.classList.add("image-message");
+    if (messageType === "video") bubble.classList.add("video-message");
+    bubble.dataset.messageId = message.id;
+    bubble.dataset.timestamp = message.created_at;
 
-  if (messageType === 'image') {
-    const imageContainer = document.createElement("div");
-    imageContainer.className = "message-image-container";
+    // Sender name (receiver only)
+    if (!isSender) {
+        const nameDiv = document.createElement("div");
+        nameDiv.className = "sender-name";
+        nameDiv.textContent = USER_NAMES[message.sender] || "Unknown";
+        bubble.appendChild(nameDiv);
+    }
+
+    // Reply reference block
+    if (message.reply_to_id) {
+        const replyBlock = document.createElement("div");
+        replyBlock.className = "message-reply";
+        const strong = document.createElement("strong");
+        strong.textContent = USER_NAMES[message.reply_to_sender] || message.reply_to_sender || "Unknown";
+        const p = document.createElement("p");
+        p.textContent = message.reply_to_text || "";
+        replyBlock.appendChild(strong);
+        replyBlock.appendChild(p);
+        replyBlock.onclick = () => scrollToMessage(message.reply_to_id);
+        bubble.appendChild(replyBlock);
+    }
+
+    // Message content
+    if (messageType === "image") {
+        renderImageContent(bubble, message, isSender);
+    } else if (messageType === "video") {
+        renderVideoContent(bubble, message);
+    } else if (messageType === "voice") {
+        renderVoiceContent(bubble, message);
+    } else {
+        renderTextContent(bubble, message);
+    }
+
+    // Meta row (time + receipt tick)
+    const metaDiv = document.createElement("div");
+    metaDiv.className = "message-meta";
+
+    const timeSpan = document.createElement("span");
+    timeSpan.textContent = formatTime(message.created_at);
+    metaDiv.appendChild(timeSpan);
+
+    if (isSender) {
+        const receipt = document.createElement("span");
+        receipt.className = `receipt ${message.read ? "read" : "sent"}`;
+        receipt.textContent = message.read ? "✓✓" : "✓";
+        metaDiv.appendChild(receipt);
+    }
+
+    bubble.appendChild(metaDiv);
+
+    // Reply button (desktop hover)
+    const replyBtn = document.createElement("button");
+    replyBtn.className = "msg-reply-btn";
+    replyBtn.title = "Reply";
+    replyBtn.innerHTML = '<span class="material-icons">reply</span>';
+    replyBtn.onclick = (e) => { e.stopPropagation(); setReply(message.id); };
+    bubble.appendChild(replyBtn);
+
+    // Swipe-to-reply (mobile)
+    addSwipeToReply(bubble, message.id);
+
+    // Insert into DOM
+    if (prepend) {
+        const first = messagesDiv.querySelector(".message-bubble");
+        if (first) messagesDiv.insertBefore(bubble, first);
+        else messagesDiv.appendChild(bubble);
+    } else {
+        messagesDiv.appendChild(bubble);
+    }
+
+    if (!isSender && !message.read) state.unreadMessages.add(message.id);
+}
+
+// --- Text with link detection + URL preview card ---
+function renderTextContent(bubble, message) {
+    const textDiv = document.createElement("div");
+    textDiv.className = `message-text ${isArabic(message.text || "") ? "rtl" : "ltr"}`;
+    renderTextWithLinks(textDiv, message.text || "");
+    bubble.appendChild(textDiv);
+
+    // Link preview card for first URL
+    const url = extractFirstLink(message.text || "");
+    if (url) {
+        const card = document.createElement("div");
+        card.className = "link-preview";
+        card.onclick = () => window.open(url, "_blank", "noopener");
+
+        const domain = getDomain(url);
+        const displayUrl = url.length > 55 ? url.substring(0, 55) + "…" : url;
+
+        card.innerHTML = `
+      <div class="link-preview-title">
+        <span class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">language</span>
+        ${escapeHtml(domain)}
+      </div>
+      <div class="link-preview-url">${escapeHtml(displayUrl)}</div>
+    `;
+        bubble.appendChild(card);
+    }
+}
+
+// --- Image content ---
+function renderImageContent(bubble, message, isSender) {
+    const container = document.createElement("div");
+    container.className = "message-image-container";
 
     const viewOnce = message.view_once || false;
     const viewedBy = message.viewed_by || [];
     const hasViewed = viewedBy.includes(state.currentUserEmail);
     const wasOpened = viewedBy.length > 0;
 
+    const viewedStyle = "width:200px;height:160px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:13px;gap:6px;";
+
     if (viewOnce && (hasViewed || (isSender && wasOpened))) {
-      const statusText = isSender ? '📷 Opened' : '📷 Photo viewed';
-      imageContainer.innerHTML = `<div class="image-viewed-overlay">${statusText}</div>`;
-      imageContainer.style.width = '200px';
-      imageContainer.style.height = '200px';
-      imageContainer.style.background = '#1e293b';
+        container.style.cssText = viewedStyle;
+        container.innerHTML = `<span class="material-icons">photo_camera</span> ${isSender ? "Opened" : "Viewed"}`;
     } else if (viewOnce && isSender && !wasOpened) {
-      imageContainer.innerHTML = '<div class="image-viewed-overlay">📷 Sent</div>';
-      imageContainer.style.width = '200px';
-      imageContainer.style.height = '200px';
-      imageContainer.style.background = '#1e293b';
-    } else if (viewOnce && !isSender && !hasViewed) {
-      const img = document.createElement("img");
-      img.className = "message-image";
-      img.alt = "Sent image";
-      img.loading = "lazy";
-
-      (async () => {
-        try {
-          let imagePath = message.image_url;
-          if (imagePath.includes('http')) {
-            const urlParts = imagePath.split('/chat-images/');
-            imagePath = urlParts[1] || imagePath;
-          }
-
-          const { data: signedUrlData, error: signedUrlError } = await state.supabaseClient.storage
-            .from('chat-images')
-            .createSignedUrl(imagePath, 3600);
-
-          if (signedUrlError) throw signedUrlError;
-
-          img.src = signedUrlData.signedUrl;
-        } catch (error) {
-          console.error('Error generating signed URL:', error);
-          img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>';
-        }
-      })();
-
-      img.onclick = () => openImageViewer(message.id, message.image_url, viewOnce, viewedBy, message.sender);
-      img.style.cursor = 'pointer';
-
-      imageContainer.appendChild(img);
-
-      const overlay = document.createElement("div");
-      overlay.className = "view-once-overlay";
-      overlay.innerHTML = '🔒 View once';
-      imageContainer.appendChild(overlay);
-    } else if (!viewOnce) {
-      const img = document.createElement("img");
-      img.className = "message-image";
-      img.alt = "Sent image";
-      img.loading = "lazy";
-
-      (async () => {
-        try {
-          let imagePath = message.image_url;
-          if (imagePath.includes('http')) {
-            const urlParts = imagePath.split('/chat-images/');
-            imagePath = urlParts[1] || imagePath;
-          }
-
-          const { data: signedUrlData, error: signedUrlError } = await state.supabaseClient.storage
-            .from('chat-images')
-            .createSignedUrl(imagePath, 3600);
-
-          if (signedUrlError) throw signedUrlError;
-
-          img.src = signedUrlData.signedUrl;
-        } catch (error) {
-          console.error('Error generating signed URL:', error);
-          img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>';
-        }
-      })();
-
-      img.onclick = () => openImageViewer(message.id, message.image_url, viewOnce, viewedBy, message.sender);
-      img.style.cursor = 'pointer';
-
-      imageContainer.appendChild(img);
-    }
-
-    bubble.appendChild(imageContainer);
-
-  } else {
-    const textDiv = document.createElement("div");
-    textDiv.className = "message-text";
-    textDiv.textContent = message.text;
-
-    if (isArabic(message.text)) {
-      textDiv.classList.add('rtl');
+        container.style.cssText = viewedStyle;
+        container.innerHTML = '<span class="material-icons">send</span> Sent';
     } else {
-      textDiv.classList.add('ltr');
+        const img = document.createElement("img");
+        img.className = "message-image";
+        img.alt = "Image";
+        img.loading = "lazy";
+        img.style.cursor = "pointer";
+
+        getSignedUrl("chat-images", message.image_url).then(url => { if (url) img.src = url; });
+        img.onclick = () => openImageViewer(message.id, message.image_url, viewOnce, viewedBy, message.sender);
+
+        container.appendChild(img);
+
+        if (viewOnce && !isSender && !hasViewed) {
+            const overlay = document.createElement("div");
+            overlay.className = "view-once-overlay";
+            overlay.innerHTML = '<span class="material-icons" style="font-size:14px">lock</span> View once';
+            container.appendChild(overlay);
+        }
     }
 
-    bubble.appendChild(textDiv);
-  }
+    bubble.appendChild(container);
+}
 
-  const metaDiv = document.createElement("div");
-  metaDiv.className = "message-meta";
-  metaDiv.textContent = formatTime(message.created_at);
+// --- Video content ---
+function renderVideoContent(bubble, message) {
+    const container = document.createElement("div");
+    container.className = "message-video-container";
+    container.style.cssText = "position:relative;width:200px;height:150px;background:#1e293b;border-radius:8px;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;";
 
-  if (isSender) {
-    const receipt = document.createElement("span");
-    receipt.className = `receipt ${message.read ? "read" : "sent"}`;
-    receipt.textContent = message.read ? " ✓✓" : " ✓";
-    metaDiv.appendChild(receipt);
-  }
+    container.innerHTML = `
+    <span class="material-icons" style="font-size:40px;color:var(--text-secondary)">video_file</span>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,0.65);
+      display:flex;align-items:center;justify-content:center;">
+      <span class="material-icons" style="color:white;font-size:28px">play_arrow</span>
+    </div>
+  `;
 
-  bubble.appendChild(metaDiv);
+    container.onclick = () => openVideoViewer(message.video_url);
+    bubble.appendChild(container);
+}
 
-  if (prepend) {
-    const firstMessage = messagesDiv.querySelector(".message-bubble");
-    if (firstMessage) {
-      messagesDiv.insertBefore(bubble, firstMessage);
-    } else {
-      messagesDiv.appendChild(bubble);
+// --- Voice content ---
+function renderVoiceContent(bubble, message) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "voice-message";
+
+    const playBtn = document.createElement("button");
+    playBtn.className = "voice-play-btn";
+    playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+
+    const waveform = document.createElement("div");
+    waveform.className = "voice-waveform";
+    const progress = document.createElement("div");
+    progress.className = "voice-progress";
+    progress.style.width = "0%";
+    waveform.appendChild(progress);
+
+    const durationEl = document.createElement("span");
+    durationEl.className = "voice-duration";
+    durationEl.textContent = message.voice_duration || "0:00";
+
+    let audio = null;
+    let isPlaying = false;
+
+    playBtn.onclick = async () => {
+        if (!audio) {
+            const url = await getSignedUrl("voice-messages", message.voice_url);
+            if (!url) return;
+            audio = new Audio(url);
+
+            audio.ontimeupdate = () => {
+                const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+                progress.style.width = pct + "%";
+                const m = Math.floor(audio.currentTime / 60);
+                const s = Math.floor(audio.currentTime % 60).toString().padStart(2, "0");
+                durationEl.textContent = `${m}:${s}`;
+            };
+
+            audio.onended = () => {
+                isPlaying = false;
+                playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+                progress.style.width = "0%";
+                durationEl.textContent = message.voice_duration || "0:00";
+            };
+        }
+
+        if (isPlaying) {
+            audio.pause();
+            isPlaying = false;
+            playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+        } else {
+            await audio.play();
+            isPlaying = true;
+            playBtn.innerHTML = '<span class="material-icons">pause</span>';
+        }
+    };
+
+    wrapper.appendChild(playBtn);
+    wrapper.appendChild(waveform);
+    wrapper.appendChild(durationEl);
+    bubble.appendChild(wrapper);
+}
+
+// --- Shared: get signed URL from any bucket ---
+async function getSignedUrl(bucket, pathOrUrl) {
+    try {
+        let path = pathOrUrl || "";
+        // Strip full URL down to storage path
+        const marker = `/${bucket}/`;
+        if (path.includes(marker)) path = path.split(marker)[1];
+
+        const { data, error } = await state.supabaseClient.storage
+            .from(bucket)
+            .createSignedUrl(path, 3600);
+
+        if (error) throw error;
+        return data.signedUrl;
+    } catch (err) {
+        console.error(`Signed URL error (${bucket}):`, err);
+        return null;
     }
-  } else {
-    messagesDiv.appendChild(bubble);
-  }
+}
 
-  if (!isSender && !message.read) {
-    state.unreadMessages.add(message.id);
-  }
+function scrollToMessage(messageId) {
+    const el = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("highlight");
+        setTimeout(() => el.classList.remove("highlight"), 1500);
+    }
+}
+
+function addSwipeToReply(bubble, messageId) {
+    let startX = 0, curX = 0, active = false;
+
+    bubble.addEventListener("touchstart", (e) => {
+        startX = e.touches[0].clientX;
+        active = true;
+        bubble.style.transition = "";
+    }, { passive: true });
+
+    bubble.addEventListener("touchmove", (e) => {
+        if (!active) return;
+        curX = e.touches[0].clientX;
+        const diff = curX - startX;
+        if (diff > 0 && diff < 80) bubble.style.transform = `translateX(${diff}px)`;
+    }, { passive: true });
+
+    bubble.addEventListener("touchend", () => {
+        const diff = curX - startX;
+        bubble.style.transition = "transform 0.2s ease";
+        bubble.style.transform = "";
+        setTimeout(() => bubble.style.transition = "", 200);
+        if (diff > 50) setReply(messageId);
+        active = false; curX = 0;
+    });
 }
 
 function updateMessageReadReceipt(messageId, isRead) {
-  const bubble = document.querySelector(`[data-message-id="${messageId}"]`);
-  if (!bubble) return;
-
-  const receipt = bubble.querySelector(".receipt");
-  if (receipt) {
-    receipt.textContent = isRead ? " ✓✓" : " ✓";
-    receipt.className = `receipt ${isRead ? "read" : "sent"}`;
-  }
+    const bubble = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!bubble) return;
+    const receipt = bubble.querySelector(".receipt");
+    if (receipt) {
+        receipt.textContent = isRead ? "✓✓" : "✓";
+        receipt.className = `receipt ${isRead ? "read" : "sent"}`;
+    }
 }
 
 // ============================================================================
-// READ RECEIPTS
+// PART 3 — READ RECEIPTS
 // ============================================================================
 
 async function markMessageAsRead(messageId) {
-  try {
-    await state.supabaseClient
-      .from("chat_messages")
-      .update({ read: true })
-      .eq("id", messageId);
-
-    state.unreadMessages.delete(messageId);
-  } catch (error) {
-    console.error("Error marking message as read:", error);
-  }
+    try {
+        await state.supabaseClient.from("chat_messages").update({ read: true }).eq("id", messageId);
+        state.unreadMessages.delete(messageId);
+    } catch (err) { console.error("markMessageAsRead:", err); }
 }
 
 async function markVisibleMessagesAsRead() {
-  if (state.unreadMessages.size === 0) return;
-
-  try {
-    const unreadIds = Array.from(state.unreadMessages);
-
-    await state.supabaseClient
-      .from("chat_messages")
-      .update({ read: true })
-      .in("id", unreadIds)
-      .neq("sender", state.currentUserEmail);
-
-    state.unreadMessages.clear();
-  } catch (error) {
-    console.error("Error marking messages as read:", error);
-  }
+    if (!state.unreadMessages.size) return;
+    try {
+        const ids = Array.from(state.unreadMessages);
+        await state.supabaseClient
+            .from("chat_messages")
+            .update({ read: true })
+            .in("id", ids)
+            .neq("sender", state.currentUserEmail);
+        state.unreadMessages.clear();
+    } catch (err) { console.error("markVisibleMessagesAsRead:", err); }
 }
 
 // ============================================================================
-// NOTIFICATIONS
+// PART 3 — NOTIFICATIONS
 // ============================================================================
 
 function showNotification(title, body) {
-  if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, {
-      body: body,
-    });
-  }
+    if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body });
+    }
 }
 
 async function sendTelegramNotification(message) {
-  try {
-    await fetch(
-      `https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: CONFIG.telegram.chatId,
-          text: message
-        })
-      }
-    );
-  } catch (error) {
-    console.error("Telegram notification failed:", error);
-  }
+    try {
+        await fetch(`https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: CONFIG.telegram.chatId, text: message })
+        });
+    } catch (err) { console.error("Telegram:", err); }
 }
 
 // ============================================================================
-// UI HELPERS
+// PART 3 — UI HELPERS
 // ============================================================================
+
 function updateFloatingDate() {
-  const messagesDiv = document.getElementById("messages");
-  const floatingDate = document.getElementById("floating-date");
+    const messagesDiv = document.getElementById("messages");
+    const floatingDate = document.getElementById("floating-date");
+    if (!floatingDate) return;
 
-  const bubbles = messagesDiv.querySelectorAll(".message-bubble");
-  if (!bubbles.length) return;
-
-  for (let bubble of bubbles) {
-    const rect = bubble.getBoundingClientRect();
-    const containerRect = messagesDiv.getBoundingClientRect();
-
-    // First visible message
-    if (rect.bottom > containerRect.top + 40) {
-      const timestamp = bubble.dataset.timestamp;
-      floatingDate.textContent = getDateLabel(timestamp);
-      break;
+    const bubbles = messagesDiv.querySelectorAll(".message-bubble");
+    for (const b of bubbles) {
+        const rect = b.getBoundingClientRect();
+        const containerRect = messagesDiv.getBoundingClientRect();
+        if (rect.bottom > containerRect.top + 40) {
+            floatingDate.textContent = getDateLabel(b.dataset.timestamp);
+            break;
+        }
     }
-  }
 }
 
 function showChatScreen() {
-  document.getElementById("login").style.display = "none";
-  document.getElementById("chat").style.display = "flex";
+    document.getElementById("login").style.display = "none";
+    document.getElementById("chat").style.display = "flex";
 }
 
-function updateConnectionStatus(text) {
-  const statusDiv = document.getElementById("connection-status");
-  if (statusDiv) statusDiv.textContent = text;
+function updateConnectionStatus(status) {
+    const div = document.getElementById("connection-status");
+    if (!div) return;
+    const dot = div.querySelector(".status-dot");
+    const text = div.querySelector(".status-text");
+
+    div.className = "status-indicator";
+
+    const map = {
+        connected: { cls: "connected", label: "Connected" },
+        disconnected: { cls: "", label: "Disconnected" },
+        loading: { cls: "", label: "Connecting…" }
+    };
+
+    const entry = map[status];
+    if (entry) {
+        if (entry.cls) div.classList.add(entry.cls);
+        if (text) text.textContent = entry.label;
+    } else {
+        if (text) text.textContent = status;
+    }
 }
 
-function showAlert(message) {
-  alert(message);
-}
+function showAlert(message) { alert(message); }
 
 function formatTime(timestamp) {
-  return new Date(timestamp).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+    return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function scrollToBottom(smooth = false) {
-  const messagesDiv = document.getElementById("messages");
-  if (smooth) {
-    messagesDiv.scrollTo({
-      top: messagesDiv.scrollHeight,
-      behavior: "smooth"
-    });
-  } else {
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  }
-  state.isAtBottom = true;
+    const div = document.getElementById("messages");
+    if (smooth) div.scrollTo({ top: div.scrollHeight, behavior: "smooth" });
+    else div.scrollTop = div.scrollHeight;
+    state.isAtBottom = true;
 }
 
 function clearMessagesUI() {
-  const messagesDiv = document.getElementById("messages");
-  const loadButton = document.getElementById("load-more-btn");
+    const div = document.getElementById("messages");
+    div.querySelectorAll(".message-bubble, .date-separator").forEach(el => el.remove());
+    state.hasMoreMessages = false;
+}
 
-  const messageBubbles = messagesDiv.querySelectorAll(".message-bubble");
-  const dateSeparators = messagesDiv.querySelectorAll(".date-separator");
-
-  messageBubbles.forEach(bubble => bubble.remove());
-  dateSeparators.forEach(sep => sep.remove());
-
-  if (loadButton) {
-    loadButton.style.display = "none";
-  }
-
-  state.hasMoreMessages = false;
+// Toggle send / mic button based on textarea content
+function updateSendVoiceToggle(text) {
+    const sendBtn = document.getElementById("send-btn");
+    const voiceBtn = document.getElementById("voice-btn");
+    if (!sendBtn || !voiceBtn) return;
+    const hasText = text.trim().length > 0;
+    sendBtn.style.display = hasText ? "flex" : "none";
+    voiceBtn.style.display = hasText ? "none" : "flex";
 }
 
 // ============================================================================
-// PANIC BUTTON
+// PART 3 — PANIC BUTTON
 // ============================================================================
 
 window.panic = function () {
-  const confirmed = confirm(
-    "⚠️ This will hide all messages from your screen.\n\n" +
-    "Messages will still exist in the database.\n\n" +
-    "Continue?"
-  );
-
-  if (confirmed) {
-    clearMessagesUI();
-    showAlert("Messages hidden. Refresh the page to reload them.");
-  }
+    if (confirm("⚠️ This will hide all messages from your screen.\n\nMessages still exist in the database.\n\nContinue?")) {
+        clearMessagesUI();
+        showAlert("Messages hidden. Refresh to reload them.");
+    }
 };
 
 // ============================================================================
-// EVENT LISTENERS
+// PART 3 — ATTACHMENT MENU
 // ============================================================================
 
-document.addEventListener("DOMContentLoaded", () => {
-  initializeApp();
-
-  const msgTextarea = document.getElementById("msg");
-
-  if (msgTextarea) {
-    msgTextarea.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        send();
-      }
-    });
-
-    msgTextarea.addEventListener("input", (e) => {
-      const textarea = e.target;
-      autoResizeTextarea(textarea);
-
-      const text = textarea.value;
-      if (text.trim().length > 0) {
-        if (isArabic(text)) {
-          textarea.style.direction = 'rtl';
-          textarea.style.textAlign = 'right';
-        } else {
-          textarea.style.direction = 'ltr';
-          textarea.style.textAlign = 'left';
-        }
-      } else {
-        textarea.style.direction = 'ltr';
-        textarea.style.textAlign = 'left';
-      }
-    });
-  }
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      const imageViewer = document.getElementById("image-viewer-modal");
-      if (imageViewer && imageViewer.style.display === "flex") {
-        closeImageViewer();
-      }
-
-      const imagePreview = document.getElementById("image-preview-modal");
-      if (imagePreview && imagePreview.style.display === "flex") {
-        cancelImageSend();
-      }
-
-      const imagePicker = document.getElementById("image-picker-modal");
-      if (imagePicker && imagePicker.style.display === "flex") {
-        closeImagePicker();
-      }
-
-      const searchBar = document.getElementById("search-bar");
-      if (searchBar && searchBar.style.display === "flex") {
-        closeSearch();
-      }
-    }
-  });
-
-  document.addEventListener("keydown", (e) => {
-    const searchBar = document.getElementById("search-bar");
-    if (!searchBar || searchBar.style.display !== "flex") return;
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      searchNext();
-    }
-
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      searchPrevious();
-    }
-  });
-});
-
-window.addEventListener("beforeunload", async () => {
-  if (state.currentUserEmail) {
-    await updatePresence(false);
-  }
-
-  if (state.channel) {
-    state.channel.unsubscribe();
-  }
-});
-
-// ============================================================================
-// IMAGE FUNCTIONALITY
-// ============================================================================
-
-window.openImagePicker = function () {
-  document.getElementById("image-picker-modal").style.display = "flex";
+window.openAttachmentMenu = function () {
+    document.getElementById("attachment-menu").style.display = "flex";
 };
 
-window.closeImagePicker = function () {
-  document.getElementById("image-picker-modal").style.display = "none";
+window.closeAttachmentMenu = function () {
+    document.getElementById("attachment-menu").style.display = "none";
 };
 
 window.openCamera = function () {
-  closeImagePicker();
-  document.getElementById("camera-input").click();
+    closeAttachmentMenu();
+    document.getElementById("camera-input").click();
 };
 
 window.openGallery = function () {
-  closeImagePicker();
-  document.getElementById("image-input").click();
+    closeAttachmentMenu();
+    document.getElementById("image-input").click();
 };
 
+window.openVideoSelector = function () {
+    closeAttachmentMenu();
+    document.getElementById("video-input").click();
+};
+
+// ============================================================================
+// PART 3 — IMAGE HANDLING (multi-select)
+// ============================================================================
+
 window.handleImageSelect = function (event) {
-  const file = event.target.files[0];
+    const files = Array.from(event.target.files || []).filter(f => f.type.startsWith("image/"));
+    if (!files.length) return;
 
-  if (!file) return;
+    state.selectedImages = [];
+    const container = document.getElementById("preview-images-container");
+    container.innerHTML = "";
 
-  if (!file.type.startsWith('image/')) {
-    showAlert('Please select an image file');
-    return;
-  }
+    let loaded = 0;
 
-  state.selectedImageFile = file;
+    files.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            state.selectedImages.push({ file, dataUrl: e.target.result, index });
+            loaded++;
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    state.selectedImageDataUrl = e.target.result;
-    document.getElementById('preview-image').src = e.target.result;
-    document.getElementById('image-preview-modal').style.display = 'flex';
-  };
-  reader.readAsDataURL(file);
+            const item = document.createElement("div");
+            item.className = "preview-image-item";
 
-  event.target.value = '';
+            const img = document.createElement("img");
+            img.src = e.target.result;
+
+            const removeBtn = document.createElement("button");
+            removeBtn.className = "remove-btn";
+            removeBtn.textContent = "×";
+            removeBtn.onclick = () => {
+                state.selectedImages = state.selectedImages.filter(si => si.index !== index);
+                item.remove();
+                if (!state.selectedImages.length) cancelImageSend();
+            };
+
+            item.appendChild(img);
+            item.appendChild(removeBtn);
+            container.appendChild(item);
+
+            if (loaded === files.length) {
+                document.getElementById("image-preview-modal").style.display = "flex";
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    event.target.value = "";
 };
 
 window.cancelImageSend = function () {
-  state.selectedImageFile = null;
-  state.selectedImageDataUrl = null;
-  document.getElementById('image-preview-modal').style.display = 'none';
-  document.getElementById('view-once-checkbox').checked = false;
+    state.selectedImages = [];
+    document.getElementById("image-preview-modal").style.display = "none";
+    document.getElementById("view-once-checkbox").checked = false;
+    document.getElementById("preview-images-container").innerHTML = "";
 };
 
 window.confirmImageSend = async function () {
-  if (!state.selectedImageFile) return;
+    if (!state.selectedImages.length) return;
 
-  const viewOnce = document.getElementById('view-once-checkbox').checked;
+    const viewOnce = document.getElementById("view-once-checkbox").checked;
+    const toSend = [...state.selectedImages];
 
-  document.getElementById('image-preview-modal').style.display = 'none';
-  updateConnectionStatus('📤 Uploading image...');
+    document.getElementById("image-preview-modal").style.display = "none";
+    document.getElementById("view-once-checkbox").checked = false;
+    document.getElementById("preview-images-container").innerHTML = "";
+    state.selectedImages = [];
 
-  try {
-    const fileExt = state.selectedImageFile.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-    const filePath = `${state.currentUserEmail}/${fileName}`;
+    updateConnectionStatus("loading");
 
-    const { data: uploadData, error: uploadError } = await state.supabaseClient.storage
-      .from('chat-images')
-      .upload(filePath, state.selectedImageFile);
+    try {
+        for (const { file } of toSend) {
+            const ext = file.name.split(".").pop();
+            const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+            const filePath = `${state.currentUserEmail}/${fileName}`;
 
-    if (uploadError) throw uploadError;
+            const { error: uploadErr } = await state.supabaseClient.storage
+                .from("chat-images")
+                .upload(filePath, file);
+            if (uploadErr) throw uploadErr;
 
-    const imageUrl = filePath;
+            const { data: msgData, error: msgErr } = await state.supabaseClient
+                .from("chat_messages")
+                .insert([{
+                    sender: state.currentUserEmail,
+                    text: null,
+                    message_type: "image",
+                    image_url: filePath,
+                    view_once: viewOnce,
+                    viewed_by: [],
+                    read: false
+                }])
+                .select()
+                .single();
+            if (msgErr) throw msgErr;
 
-    const { data: messageData, error: messageError } = await state.supabaseClient
-      .from('chat_messages')
-      .insert([{
-        sender: state.currentUserEmail,
-        text: null,
-        message_type: 'image',
-        image_url: imageUrl,
-        view_once: viewOnce,
-        viewed_by: [],
-        read: false
-      }])
-      .select()
-      .single();
+            if (!state.allMessages.some(m => m.id === msgData.id)) {
+                state.allMessages.push(msgData);
+                renderMessage(msgData, false);
+            }
 
-    if (messageError) throw messageError;
+            scrollToBottom(true);
+            await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-    const lastMsg = state.allMessages[state.allMessages.length - 1];
-    if (lastMsg) {
-      const lastDate = new Date(lastMsg.created_at).toDateString();
-      const newDate = new Date(messageData.created_at).toDateString();
+            if (state.currentUserEmail === "ayaessam487@gmail.com") {
+                await sendTelegramNotification(`My Love sent ${viewOnce ? "a view-once photo 🔒" : "a photo"}`);
+            }
+        }
+        updateConnectionStatus("connected");
+    } catch (err) {
+        console.error("confirmImageSend:", err);
+        showAlert("Failed to send image(s). Please try again.");
+        updateConnectionStatus("connected");
     }
-
-    renderMessage(messageData, false);
-    state.allMessages.push(messageData);
-    scrollToBottom(true);
-
-    await state.channel.send({
-      type: 'broadcast',
-      event: 'new-message',
-      payload: messageData
-    });
-
-    if (state.currentUserEmail === "ayaessam487@gmail.com") {
-      const messageType = viewOnce ? "a view-once photo 🔒" : "a photo";
-      await sendTelegramNotification(`My Love sent ${messageType}`);
-    }
-
-    updateConnectionStatus('🟢 Connected');
-
-  } catch (error) {
-    console.error('Error sending image:', error);
-    showAlert('Failed to send image. Please try again.');
-    updateConnectionStatus('🟢 Connected');
-  } finally {
-    state.selectedImageFile = null;
-    state.selectedImageDataUrl = null;
-    document.getElementById('view-once-checkbox').checked = false;
-  }
 };
 
-window.openImageViewer = async function (messageId, imagePathOrUrl, viewOnce, viewedBy, senderEmail) {
-  const currentUser = state.currentUserEmail;
-  const hasViewed = viewedBy && viewedBy.includes(currentUser);
+window.openImageViewer = async function (messageId, imagePath, viewOnce, viewedBy, senderEmail) {
+    const hasViewed = (viewedBy || []).includes(state.currentUserEmail);
+    if (viewOnce && hasViewed) return;
 
-  if (viewOnce && hasViewed) {
-    return;
-  }
+    try {
+        const url = await getSignedUrl("chat-images", imagePath);
+        if (!url) throw new Error("No URL");
 
-  try {
-    let imagePath = imagePathOrUrl;
-    if (imagePath.includes('http')) {
-      const urlParts = imagePath.split('/chat-images/');
-      imagePath = urlParts[1] || imagePath;
-    }
+        document.getElementById("viewer-image").src = url;
+        document.getElementById("viewer-info").textContent = (viewOnce && !hasViewed) ? "🔒 View-once photo" : "";
+        document.getElementById("image-viewer-modal").style.display = "flex";
 
-    const { data: signedUrlData, error: signedUrlError } = await state.supabaseClient.storage
-      .from('chat-images')
-      .createSignedUrl(imagePath, 3600);
+        if (viewOnce && !hasViewed) {
+            const { error } = await state.supabaseClient
+                .from("chat_messages")
+                .update({ viewed_by: [...(viewedBy || []), state.currentUserEmail] })
+                .eq("id", messageId);
+            if (error) throw error;
 
-    if (signedUrlError) throw signedUrlError;
+            setTimeout(() => {
+                const el = document.querySelector(`[data-message-id="${messageId}"]`);
+                if (el) {
+                    const c = el.querySelector(".message-image-container");
+                    if (c) {
+                        c.innerHTML = '<span class="material-icons">photo_camera</span> Photo viewed';
+                        c.style.cssText = "width:200px;height:160px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:13px;gap:6px;";
+                    }
+                }
+            }, 100);
 
-    document.getElementById('viewer-image').src = signedUrlData.signedUrl;
-
-    const infoDiv = document.getElementById('viewer-info');
-    if (viewOnce && !hasViewed) {
-      infoDiv.textContent = '🔒 This is a view-once photo';
-    } else {
-      infoDiv.textContent = '';
-    }
-
-    document.getElementById('image-viewer-modal').style.display = 'flex';
-
-    if (viewOnce && !hasViewed) {
-      try {
-        const { error } = await state.supabaseClient
-          .from('chat_messages')
-          .update({
-            viewed_by: [...(viewedBy || []), currentUser]
-          })
-          .eq('id', messageId);
-
-        if (error) throw error;
-
-        if (currentUser === "ayaessam487@gmail.com") {
-          const senderName = USER_NAMES[senderEmail] || senderEmail;
-          await sendTelegramNotification(`My Love opened ${senderName}'s photo 👀`);
-        }
-
-        setTimeout(() => {
-          const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
-          if (messageElement) {
-            const imageContainer = messageElement.querySelector('.message-image-container');
-            if (imageContainer) {
-              imageContainer.innerHTML = '<div class="image-viewed-overlay">📷 Photo viewed</div>';
+            if (state.channel) {
+                state.channel.send({ type: "broadcast", event: "image-viewed", payload: { messageId, viewerId: state.currentUserEmail } });
             }
-          }
-        }, 100);
 
-        if (state.channel) {
-          state.channel.send({
-            type: 'broadcast',
-            event: 'image-viewed',
-            payload: { messageId, viewerId: currentUser }
-          });
+            if (state.currentUserEmail === "ayaessam487@gmail.com") {
+                await sendTelegramNotification(`My Love opened ${USER_NAMES[senderEmail] || senderEmail}'s photo 👀`);
+            }
         }
-
-      } catch (error) {
-        console.error('Error marking image as viewed:', error);
-      }
+    } catch (err) {
+        console.error("openImageViewer:", err);
+        showAlert("Failed to load image");
     }
-  } catch (error) {
-    console.error('Error opening image viewer:', error);
-    showAlert('Failed to load image');
-  }
 };
 
 window.closeImageViewer = function () {
-  document.getElementById('image-viewer-modal').style.display = 'none';
+    document.getElementById("image-viewer-modal").style.display = "none";
 };
 
 window.closeImageViewerOnOutsideClick = function (event) {
-  if (event.target.id === 'image-viewer-modal') {
-    closeImageViewer();
-  }
+    if (event.target.id === "image-viewer-modal") closeImageViewer();
 };
+
+// ============================================================================
+// PART 3 — VIDEO HANDLING
+// ============================================================================
+
+window.handleVideoSelect = function (event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("video/")) { showAlert("Please select a video file"); return; }
+    if (file.size > 50 * 1024 * 1024) { showAlert("Video must be under 50 MB"); return; }
+
+    state.selectedVideo = file;
+    const videoEl = document.getElementById("preview-video");
+    videoEl.src = URL.createObjectURL(file);
+    document.getElementById("video-preview-modal").style.display = "flex";
+    event.target.value = "";
+};
+
+window.cancelVideoSend = function () {
+    state.selectedVideo = null;
+    const v = document.getElementById("preview-video");
+    v.pause(); v.src = "";
+    document.getElementById("video-preview-modal").style.display = "none";
+};
+
+window.confirmVideoSend = async function () {
+    if (!state.selectedVideo) return;
+    const file = state.selectedVideo;
+    state.selectedVideo = null;
+
+    document.getElementById("video-preview-modal").style.display = "none";
+    updateConnectionStatus("loading");
+
+    try {
+        const ext = file.name.split(".").pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+        const filePath = `${state.currentUserEmail}/${fileName}`;
+
+        const { error: uploadErr } = await state.supabaseClient.storage
+            .from("chat-videos")
+            .upload(filePath, file);
+        if (uploadErr) throw uploadErr;
+
+        const { data: msgData, error: msgErr } = await state.supabaseClient
+            .from("chat_messages")
+            .insert([{
+                sender: state.currentUserEmail,
+                text: null,
+                message_type: "video",
+                video_url: filePath,
+                read: false
+            }])
+            .select()
+            .single();
+        if (msgErr) throw msgErr;
+
+        if (!state.allMessages.some(m => m.id === msgData.id)) {
+            state.allMessages.push(msgData);
+            renderMessage(msgData, false);
+        }
+
+        scrollToBottom(true);
+        await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
+
+        if (state.currentUserEmail === "ayaessam487@gmail.com") {
+            await sendTelegramNotification("My Love sent a video 🎥");
+        }
+
+        updateConnectionStatus("connected");
+    } catch (err) {
+        console.error("confirmVideoSend:", err);
+        showAlert("Failed to send video. Please try again.");
+        updateConnectionStatus("connected");
+    }
+};
+
+window.openVideoViewer = async function (videoPath) {
+    try {
+        const url = await getSignedUrl("chat-videos", videoPath);
+        if (!url) throw new Error("No URL");
+
+        const v = document.getElementById("viewer-video");
+        v.src = url;
+        document.getElementById("video-viewer-modal").style.display = "flex";
+        v.play();
+    } catch (err) {
+        console.error("openVideoViewer:", err);
+        showAlert("Failed to load video");
+    }
+};
+
+window.closeVideoViewer = function () {
+    const v = document.getElementById("viewer-video");
+    v.pause(); v.src = "";
+    document.getElementById("video-viewer-modal").style.display = "none";
+};
+
+window.closeVideoViewerOnOutsideClick = function (event) {
+    if (event.target.id === "video-viewer-modal") closeVideoViewer();
+};
+
+// ============================================================================
+// PART 3 — VOICE RECORDING
+// ============================================================================
+
+window.toggleVoiceRecording = async function () {
+    if (state.voiceRecorder && state.voiceRecorder.state === "recording") {
+        state.voiceRecorder.stop();
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        const chunks = [];
+
+        state.voiceRecorder = recorder;
+        state.voiceRecordingStartTime = Date.now();
+
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+        recorder.onstop = () => {
+            state.voiceBlob = new Blob(chunks, { type: "audio/webm" });
+            stream.getTracks().forEach(t => t.stop());
+        };
+
+        recorder.start();
+
+        // Swap UI: hide input area, show recording bar
+        document.querySelector(".input-area").style.display = "none";
+        document.getElementById("voice-recording").style.display = "flex";
+
+        state.voiceRecordingInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - state.voiceRecordingStartTime) / 1000);
+            const m = Math.floor(elapsed / 60);
+            const s = (elapsed % 60).toString().padStart(2, "0");
+            document.getElementById("recording-time").textContent = `${m}:${s}`;
+        }, 1000);
+
+    } catch (err) {
+        console.error("Mic error:", err);
+        showAlert("Could not access microphone. Please allow microphone access.");
+    }
+};
+
+function stopVoiceRecordingUI() {
+    clearInterval(state.voiceRecordingInterval);
+    state.voiceRecordingInterval = null;
+    document.querySelector(".input-area").style.display = "flex";
+    document.getElementById("voice-recording").style.display = "none";
+    document.getElementById("recording-time").textContent = "0:00";
+}
+
+window.cancelVoiceRecording = function () {
+    if (state.voiceRecorder && state.voiceRecorder.state === "recording") state.voiceRecorder.stop();
+    stopVoiceRecordingUI();
+    state.voiceBlob = null;
+    state.voiceRecorder = null;
+};
+
+window.sendVoiceRecording = async function () {
+    const durationMs = Date.now() - state.voiceRecordingStartTime;
+
+    if (state.voiceRecorder && state.voiceRecorder.state === "recording") {
+        state.voiceRecorder.stop();
+        // Wait for onstop blob assembly
+        await new Promise(r => setTimeout(r, 350));
+    }
+
+    stopVoiceRecordingUI();
+
+    const blob = state.voiceBlob;
+    state.voiceBlob = null;
+    state.voiceRecorder = null;
+
+    if (!blob) return;
+
+    const totalSecs = Math.floor(durationMs / 1000);
+    const durationLabel = `${Math.floor(totalSecs / 60)}:${(totalSecs % 60).toString().padStart(2, "0")}`;
+
+    updateConnectionStatus("loading");
+
+    try {
+        const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.webm`;
+        const filePath = `${state.currentUserEmail}/${fileName}`;
+
+        const { error: uploadErr } = await state.supabaseClient.storage
+            .from("voice-messages")
+            .upload(filePath, blob, { contentType: "audio/webm" });
+        if (uploadErr) throw uploadErr;
+
+        const { data: msgData, error: msgErr } = await state.supabaseClient
+            .from("chat_messages")
+            .insert([{
+                sender: state.currentUserEmail,
+                text: null,
+                message_type: "voice",
+                voice_url: filePath,
+                voice_duration: durationLabel,
+                read: false
+            }])
+            .select()
+            .single();
+        if (msgErr) throw msgErr;
+
+        if (!state.allMessages.some(m => m.id === msgData.id)) {
+            state.allMessages.push(msgData);
+            renderMessage(msgData, false);
+        }
+
+        scrollToBottom(true);
+        await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
+
+        if (state.currentUserEmail === "ayaessam487@gmail.com") {
+            await sendTelegramNotification("My Love sent a voice message 🎤");
+        }
+
+        updateConnectionStatus("connected");
+    } catch (err) {
+        console.error("sendVoiceRecording:", err);
+        showAlert("Failed to send voice message");
+        updateConnectionStatus("connected");
+    }
+};
+
+// ============================================================================
+// PART 3 — DYNAMIC CSS INJECTION
+// (Adds styles that the static CSS file doesn't cover for new features)
+// ============================================================================
+
+function injectDynamicStyles() {
+    const style = document.createElement("style");
+    style.textContent = `
+    /* --- Date Separator --- */
+    .date-separator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 4px;
+      pointer-events: none;
+    }
+    .date-separator::before,
+    .date-separator::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .date-separator span {
+      padding: 4px 12px;
+      background: var(--message-bg);
+      border-radius: 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    /* --- Reply button (hover, desktop) --- */
+    .message-bubble { position: relative; }
+
+    .msg-reply-btn {
+      display: none;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: var(--message-bg);
+      color: var(--text-secondary);
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+      transition: background 0.2s, color 0.2s;
+      z-index: 5;
+    }
+    .msg-reply-btn .material-icons { font-size: 18px; }
+    .message-bubble.sender  .msg-reply-btn { left: -42px; }
+    .message-bubble.receiver .msg-reply-btn { right: -42px; }
+    .message-bubble:hover .msg-reply-btn { display: flex; }
+    .msg-reply-btn:hover { background: var(--hover); color: var(--text-primary); }
+
+    /* --- Link preview card --- */
+    .link-preview {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: rgba(0,0,0,0.25);
+      border-radius: 8px;
+      border-left: 3px solid var(--primary);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .link-preview:hover { background: rgba(0,0,0,0.38); }
+    .link-preview-title {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .link-preview-url {
+      font-size: 11px;
+      color: var(--text-secondary);
+      word-break: break-all;
+    }
+
+    /* --- Message text links --- */
+    .message-text a {
+      color: #53BDEB;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(83,189,235,0.3);
+    }
+    .message-text a:hover { border-bottom-color: #53BDEB; }
+
+    /* --- Voice message bubble --- */
+    .voice-message { min-width: 200px; }
+
+    /* --- Video container cursor --- */
+    .message-video-container { cursor: pointer; }
+
+    /* --- Smooth swipe transition --- */
+    .message-bubble { will-change: transform; }
+  `;
+    document.head.appendChild(style);
+}
+
+// ============================================================================
+// PART 3 — EVENT LISTENERS
+// ============================================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+    initializeApp();
+    injectDynamicStyles();
+
+    const msgTextarea = document.getElementById("msg");
+
+    // Initial state: show mic, hide send (no text yet)
+    updateSendVoiceToggle("");
+
+    if (msgTextarea) {
+        msgTextarea.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+        });
+
+        msgTextarea.addEventListener("input", (e) => {
+            const ta = e.target;
+            autoResizeTextarea(ta);
+            updateSendVoiceToggle(ta.value);
+
+            const text = ta.value;
+            if (text.trim().length > 0) {
+                ta.style.direction = isArabic(text) ? "rtl" : "ltr";
+                ta.style.textAlign = isArabic(text) ? "right" : "left";
+            } else {
+                ta.style.direction = "ltr";
+                ta.style.textAlign = "left";
+            }
+        });
+    }
+
+    // Escape closes any open overlay
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+
+        const checks = [
+            { id: "image-viewer-modal", fn: closeImageViewer },
+            { id: "video-viewer-modal", fn: closeVideoViewer },
+            { id: "image-preview-modal", fn: cancelImageSend },
+            { id: "video-preview-modal", fn: cancelVideoSend },
+            { id: "attachment-menu", fn: closeAttachmentMenu },
+            { id: "search-bar", fn: closeSearch }
+        ];
+
+        for (const { id, fn } of checks) {
+            const el = document.getElementById(id);
+            if (el && el.style.display === "flex") { fn(); break; }
+        }
+    });
+
+    // Arrow keys navigate search results
+    document.addEventListener("keydown", (e) => {
+        const bar = document.getElementById("search-bar");
+        if (!bar || bar.style.display !== "flex") return;
+        if (e.key === "ArrowDown") { e.preventDefault(); searchNext(); }
+        if (e.key === "ArrowUp") { e.preventDefault(); searchPrevious(); }
+    });
+});
+
+window.addEventListener("beforeunload", async () => {
+    if (state.currentUserEmail) await updatePresence(false);
+    if (state.channel) state.channel.unsubscribe();
+});
