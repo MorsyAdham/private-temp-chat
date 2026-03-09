@@ -953,7 +953,6 @@ async function markVisibleMessagesAsRead() {
             .in("id", ids)
             .neq("sender", state.currentUserEmail);
         state.unreadMessages.clear();
-        ayaNotify("read your messages 👀");
     } catch (err) { console.error("markVisibleMessagesAsRead:", err); }
 }
 
