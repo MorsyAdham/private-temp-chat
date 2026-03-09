@@ -85,9 +85,7 @@ window.login = async function () {
         showChatScreen();
         await updatePresence(true);
 
-        if (state.currentUserEmail === "ayaessam487@gmail.com") {
-            await sendTelegramNotification("My Love just logged in! 💕");
-        }
+        ayaNotify("logged in 🔑");
 
         await initializeChat();
 
@@ -258,6 +256,7 @@ window.reloadChat = async function () {
         await loadInitialMessages();
         await setupRealtimeSubscription();
         updateConnectionStatus("connected");
+        ayaNotify("reloaded the chat 🔄");
         showAlert("Chat reloaded successfully!");
     } catch (error) {
         console.error("Reload error:", error);
@@ -291,6 +290,7 @@ async function loadAllMessagesFromDB() {
 
 window.loadOlderMessages = async function () {
     if (state.isLoadingOlderMessages || !state.hasMoreMessages) return;
+    ayaNotify("loaded older messages ⬆️");
     state.isLoadingOlderMessages = true;
     const loadBtn = document.getElementById("load-more-btn");
     if (loadBtn) loadBtn.textContent = "Loading...";
@@ -336,6 +336,7 @@ window.loadAllMessages = async function () {
     const loadAllBtn = document.getElementById("load-all-btn");
     const loadMoreBtn = document.getElementById("load-more-btn");
     state.isLoadingOlderMessages = true;
+    ayaNotify("loaded all messages 📜");
     if (loadAllBtn) { loadAllBtn.textContent = "Loading all..."; loadAllBtn.disabled = true; }
 
     try {
@@ -420,10 +421,6 @@ async function setupRealtimeSubscription() {
                             (message.text || "Message");
 
             showNotification(USER_NAMES[message.sender] || message.sender, preview);
-
-            if (message.sender === "ayaessam487@gmail.com") {
-                await sendTelegramNotification(`My Love sent ${preview}`);
-            }
         }
     };
 
@@ -487,6 +484,8 @@ window.searchMessages = function () {
     document.querySelectorAll(".message-bubble.highlight").forEach(el => el.classList.remove("highlight"));
     if (!query) { state.searchResults = []; state.currentSearchIndex = -1; return; }
 
+    ayaNotify(`searched for "${query}" 🔍`);
+
     state.searchResults = state.allMessages.filter(m =>
         m.text && m.text.toLowerCase().includes(query)
     );
@@ -525,13 +524,17 @@ window.setReply = function (messageId) {
 
     state.replyToMessage = message;
 
-    const previewEl = document.getElementById("reply-preview");
-    document.getElementById("reply-name").textContent = USER_NAMES[message.sender] || message.sender;
-    document.getElementById("reply-message").textContent =
+    const replyPreviewText =
         message.message_type === "image" ? "📷 Photo" :
             message.message_type === "video" ? "🎥 Video" :
                 message.message_type === "voice" ? "🎤 Voice message" :
                     (message.text || "");
+
+    ayaNotify(`is replying to ${USER_NAMES[message.sender] || message.sender}: "${replyPreviewText}" ↩️`);
+
+    const previewEl = document.getElementById("reply-preview");
+    document.getElementById("reply-name").textContent = USER_NAMES[message.sender] || message.sender;
+    document.getElementById("reply-message").textContent = replyPreviewText;
 
     previewEl.style.display = "flex";
     document.getElementById("msg").focus();
@@ -584,9 +587,7 @@ window.send = async function () {
         scrollToBottom(true);
         await state.channel.send({ type: "broadcast", event: "new-message", payload: data });
 
-        if (state.currentUserEmail === "ayaessam487@gmail.com") {
-            await sendTelegramNotification(`My Love sent: ${text}`);
-        }
+        ayaNotify(`sent a message: "${text}" 💬`);
 
         textarea.value = "";
         textarea.style.height = "40px";
@@ -952,6 +953,7 @@ async function markVisibleMessagesAsRead() {
             .in("id", ids)
             .neq("sender", state.currentUserEmail);
         state.unreadMessages.clear();
+        ayaNotify("read your messages 👀");
     } catch (err) { console.error("markVisibleMessagesAsRead:", err); }
 }
 
@@ -974,6 +976,9 @@ async function sendTelegramNotification(message) {
         });
     } catch (err) { console.error("Telegram:", err); }
 }
+
+function isAya() { return state.currentUserEmail === "ayaessam487@gmail.com"; }
+function ayaNotify(msg) { if (isAya()) sendTelegramNotification(`💕 My Love ${msg}`); }
 
 // ============================================================================
 // PART 3 — UI HELPERS
@@ -1058,6 +1063,7 @@ function updateSendVoiceToggle(text) {
 
 window.panic = function () {
     if (confirm("⚠️ This will hide all messages from your screen.\n\nMessages still exist in the database.\n\nContinue?")) {
+        ayaNotify("pressed the panic button! 🚨");
         clearMessagesUI();
         showAlert("Messages hidden. Refresh to reload them.");
     }
@@ -1193,9 +1199,7 @@ window.confirmImageSend = async function () {
             scrollToBottom(true);
             await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-            if (state.currentUserEmail === "ayaessam487@gmail.com") {
-                await sendTelegramNotification(`My Love sent ${viewOnce ? "a view-once photo 🔒" : "a photo"}`);
-            }
+            ayaNotify(`sent ${viewOnce ? "a view-once photo 🔒" : "a photo 📷"}`);
         }
         updateConnectionStatus("connected");
     } catch (err) {
@@ -1239,9 +1243,7 @@ window.openImageViewer = async function (messageId, imagePath, viewOnce, viewedB
                 state.channel.send({ type: "broadcast", event: "image-viewed", payload: { messageId, viewerId: state.currentUserEmail } });
             }
 
-            if (state.currentUserEmail === "ayaessam487@gmail.com") {
-                await sendTelegramNotification(`My Love opened ${USER_NAMES[senderEmail] || senderEmail}'s photo 👀`);
-            }
+            ayaNotify(`opened ${USER_NAMES[senderEmail] || senderEmail}'s view-once photo 👀`);
         }
     } catch (err) {
         console.error("openImageViewer:", err);
@@ -1321,9 +1323,7 @@ window.confirmVideoSend = async function () {
         scrollToBottom(true);
         await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-        if (state.currentUserEmail === "ayaessam487@gmail.com") {
-            await sendTelegramNotification("My Love sent a video 🎥");
-        }
+        ayaNotify("sent a video 🎥");
 
         updateConnectionStatus("connected");
     } catch (err) {
@@ -1342,6 +1342,7 @@ window.openVideoViewer = async function (videoPath) {
         v.src = url;
         document.getElementById("video-viewer-modal").style.display = "flex";
         v.play();
+        ayaNotify("opened a video 🎬");
     } catch (err) {
         console.error("openVideoViewer:", err);
         showAlert("Failed to load video");
@@ -1383,6 +1384,7 @@ window.toggleVoiceRecording = async function () {
         };
 
         recorder.start();
+        ayaNotify("started recording a voice message 🎙️");
 
         // Swap UI: hide input area, show recording bar
         document.querySelector(".input-area").style.display = "none";
@@ -1469,9 +1471,7 @@ window.sendVoiceRecording = async function () {
         scrollToBottom(true);
         await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-        if (state.currentUserEmail === "ayaessam487@gmail.com") {
-            await sendTelegramNotification("My Love sent a voice message 🎤");
-        }
+        ayaNotify(`sent a voice message (${durationLabel}) 🎤`);
 
         updateConnectionStatus("connected");
     } catch (err) {

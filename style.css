@@ -42,7 +42,7 @@ body {
 .wrapper {
   width: 100%;
   max-width: 500px;
-  height: 95vh;
+  height: 85vh;
   max-height: 900px;
   display: flex;
   flex-direction: column;
@@ -394,10 +394,10 @@ input:focus {
    ============================================================================ */
 .jump-bottom {
   position: fixed;
-  bottom: 100px;
+  bottom: 200px;
   right: calc(50% - 240px);
-  width: 44px;
-  height: 44px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: var(--primary);
   color: white;
