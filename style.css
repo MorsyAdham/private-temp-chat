@@ -96,6 +96,10 @@ body {
   transition: background 0.35s ease, color 0.25s ease;
 }
 
+body.app-view-enabled {
+  padding: 0;
+}
+
 /* ============================================================================
    LAYOUT
    ============================================================================ */
@@ -106,6 +110,12 @@ body {
   max-height: 900px;
   display: flex;
   flex-direction: column;
+}
+
+body.app-view-enabled .wrapper {
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
 }
 
 .container {
@@ -119,6 +129,12 @@ body {
   border: 1px solid var(--border);
   box-shadow: var(--surface-shadow);
   backdrop-filter: blur(16px);
+}
+
+body.app-view-enabled .container {
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
 }
 
 /* ============================================================================
@@ -238,21 +254,56 @@ input:focus {
   display: flex;
   gap: 4px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .theme-toggle-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
   height: 40px;
-  padding: 0 14px;
+  width: 40px;
+  padding: 0;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.45);
   color: var(--text-primary);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   box-shadow: 0 8px 18px var(--accent-glow);
+}
+
+.app-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  width: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: 0 8px 18px var(--accent-glow);
+}
+
+.app-view-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.app-view-label {
+  font-size: 13px;
+  font-weight: 700;
+  display: none;
+}
+
+body.app-view-enabled .app-view-btn {
+  background: var(--primary);
+  color: white;
+  border-color: transparent;
 }
 
 .theme-toggle-btn:hover {
@@ -281,6 +332,7 @@ body:not([data-theme="classic"]) .theme-toggle-btn {
 .theme-toggle-label {
   font-size: 13px;
   font-weight: 700;
+  display: none;
 }
 
 /* ============================================================================
@@ -517,6 +569,11 @@ body:not([data-theme="classic"]) .theme-toggle-btn {
   box-shadow: var(--panel-shadow);
   transition: all 0.2s;
   z-index: 100;
+}
+
+body.app-view-enabled .jump-bottom {
+  right: 20px;
+  bottom: 118px;
 }
 
 .jump-bottom:hover {
@@ -1480,7 +1537,17 @@ textarea:focus {
     display: none;
   }
 
+  .app-view-label {
+    display: none;
+  }
+
   .theme-toggle-btn {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .app-view-btn {
     width: 40px;
     padding: 0;
     justify-content: center;

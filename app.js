@@ -52,6 +52,7 @@ const DAILY_TODO_TEMPLATE = {
 
 const DAILY_TODO_STORAGE_KEY = "my-love-daily-todo-progress-v1";
 const THEME_STORAGE_KEY = "private-chat-theme-v1";
+const APP_VIEW_STORAGE_KEY = "private-chat-app-view-v1";
 const THEMES = {
     "midnight-cute": {
         emoji: "💕",
@@ -108,6 +109,7 @@ const state = {
     voicePreviewUrl: "",
     voicePreviewDurationSeconds: 0,
     activeTheme: "midnight-cute",
+    appViewEnabled: false,
     todoTemplate: DAILY_TODO_TEMPLATE,
     todoToday: null,
     todoDayWatcher: null
@@ -279,6 +281,10 @@ function getStoredTheme() {
     return THEMES[storedTheme] ? storedTheme : "midnight-cute";
 }
 
+function getStoredAppViewPreference() {
+    return localStorage.getItem(APP_VIEW_STORAGE_KEY) === "true";
+}
+
 function updateThemeToggleButton() {
     const button = document.getElementById("theme-toggle-btn");
     const emoji = document.getElementById("theme-toggle-emoji");
@@ -311,6 +317,55 @@ function getNextThemeName(currentTheme) {
 window.toggleTheme = function () {
     const nextTheme = getNextThemeName(state.activeTheme);
     applyTheme(nextTheme);
+};
+
+function updateAppViewButton() {
+    const button = document.getElementById("app-view-btn");
+    const icon = document.getElementById("app-view-icon");
+    const label = document.getElementById("app-view-label");
+    if (!button || !icon || !label) return;
+
+    const isEnabled = state.appViewEnabled;
+    icon.textContent = isEnabled ? "fullscreen_exit" : "smartphone";
+    label.textContent = isEnabled ? "Exit App View" : "App View";
+    button.title = isEnabled ? "Exit app view" : "Enter app view";
+    button.setAttribute("aria-label", button.title);
+}
+
+function applyAppViewLayout(enabled) {
+    state.appViewEnabled = enabled;
+    document.body.classList.toggle("app-view-enabled", enabled);
+    localStorage.setItem(APP_VIEW_STORAGE_KEY, String(enabled));
+    updateAppViewButton();
+}
+
+async function requestBrowserFullscreen() {
+    if (document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+    try {
+        await document.documentElement.requestFullscreen();
+    } catch (error) {
+        console.warn("Fullscreen request was not granted:", error);
+    }
+}
+
+async function exitBrowserFullscreen() {
+    if (!document.fullscreenElement || !document.exitFullscreen) return;
+    try {
+        await document.exitFullscreen();
+    } catch (error) {
+        console.warn("Fullscreen exit failed:", error);
+    }
+}
+
+window.toggleAppView = async function () {
+    if (state.appViewEnabled) {
+        await exitBrowserFullscreen();
+        applyAppViewLayout(false);
+        return;
+    }
+
+    applyAppViewLayout(true);
+    await requestBrowserFullscreen();
 };
 
 function getTodoMetrics(record = state.todoToday) {
@@ -2185,6 +2240,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initializeApp();
     injectDynamicStyles();
     applyTheme(getStoredTheme());
+    applyAppViewLayout(getStoredAppViewPreference());
 
     const msgTextarea = document.getElementById("msg");
 
@@ -2238,6 +2294,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!bar || bar.style.display !== "flex") return;
         if (e.key === "ArrowDown") { e.preventDefault(); searchNext(); }
         if (e.key === "ArrowUp") { e.preventDefault(); searchPrevious(); }
+    });
+
+    document.addEventListener("fullscreenchange", () => {
+        updateAppViewButton();
     });
 });
 
