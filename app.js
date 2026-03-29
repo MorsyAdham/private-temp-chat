@@ -110,6 +110,7 @@ const state = {
     voicePreviewDurationSeconds: 0,
     activeTheme: "midnight-cute",
     appViewEnabled: false,
+    keyboardInset: 0,
     todoTemplate: DAILY_TODO_TEMPLATE,
     todoToday: null,
     todoDayWatcher: null
@@ -330,6 +331,31 @@ function updateAppViewButton() {
     label.textContent = isEnabled ? "Exit App View" : "App View";
     button.title = isEnabled ? "Exit app view" : "Enter app view";
     button.setAttribute("aria-label", button.title);
+}
+
+function applyViewportMetrics(viewportHeight = window.innerHeight, keyboardInset = 0) {
+    const safeHeight = Math.max(320, Math.round(viewportHeight || window.innerHeight || 0));
+    const safeInset = Math.max(0, Math.round(keyboardInset || 0));
+    state.keyboardInset = safeInset;
+    document.documentElement.style.setProperty("--app-height", `${safeHeight}px`);
+    document.documentElement.style.setProperty("--keyboard-inset", `${safeInset}px`);
+}
+
+function syncViewportLayout() {
+    const vv = window.visualViewport;
+    if (!vv) {
+        applyViewportMetrics(window.innerHeight, 0);
+        return;
+    }
+
+    const layoutHeight = vv.height + vv.offsetTop;
+    const keyboardInset = Math.max(0, window.innerHeight - layoutHeight);
+    const effectiveInset = keyboardInset > 120 ? keyboardInset : 0;
+    applyViewportMetrics(layoutHeight, effectiveInset);
+
+    if (effectiveInset > 0) {
+        requestAnimationFrame(() => scrollToBottom(false));
+    }
 }
 
 function applyAppViewLayout(enabled) {
@@ -2241,6 +2267,7 @@ document.addEventListener("DOMContentLoaded", () => {
     injectDynamicStyles();
     applyTheme(getStoredTheme());
     applyAppViewLayout(getStoredAppViewPreference());
+    syncViewportLayout();
 
     const msgTextarea = document.getElementById("msg");
 
@@ -2298,6 +2325,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.addEventListener("fullscreenchange", () => {
         updateAppViewButton();
+    });
+
+    window.addEventListener("resize", syncViewportLayout);
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", syncViewportLayout);
+        window.visualViewport.addEventListener("scroll", syncViewportLayout);
+    }
+
+    document.addEventListener("focusin", (event) => {
+        if (event.target?.matches("textarea, input, [contenteditable='true']")) {
+            setTimeout(syncViewportLayout, 50);
+            setTimeout(() => scrollToBottom(false), 120);
+        }
+    });
+
+    document.addEventListener("focusout", () => {
+        setTimeout(syncViewportLayout, 120);
     });
 });
 
