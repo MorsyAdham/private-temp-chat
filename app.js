@@ -13,7 +13,7 @@ const CONFIG = {
     },
     pagination: {
         initialLoad: 200,
-        pageSize: 200
+        pageSize: 1000
     }
 };
 
@@ -662,7 +662,8 @@ async function setupRealtimeSubscription() {
     state.channel.on("broadcast", { event: "new-message" }, (p) => handleNewMessage(p.payload));
 
     state.channel.on("broadcast", { event: "image-viewed" }, (p) => {
-        const { messageId } = p.payload;
+        const { messageId, viewerId } = p.payload;
+        updateMessageViewedState(messageId, viewerId);
         const el = document.querySelector(`[data-message-id="${messageId}"]`);
         if (el) {
             const c = el.querySelector(".message-image-container");
@@ -670,6 +671,16 @@ async function setupRealtimeSubscription() {
                 c.innerHTML = '<div class="image-viewed-overlay"><span class="material-icons" style="font-size:18px">photo_camera</span> Opened</div>';
                 c.style.cssText = "width:200px;height:160px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;";
             }
+        }
+    });
+
+    state.channel.on("broadcast", { event: "video-viewed" }, (p) => {
+        const { messageId, viewerId } = p.payload;
+        updateMessageViewedState(messageId, viewerId);
+        const el = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (el) {
+            const c = el.querySelector(".message-video-container");
+            if (c) renderExpiredMediaState(c, "videocam", "Opened");
         }
     });
 
@@ -905,7 +916,7 @@ function renderMessage(message, prepend = false) {
     if (messageType === "image") {
         renderImageContent(bubble, message, isSender);
     } else if (messageType === "video") {
-        renderVideoContent(bubble, message);
+        renderVideoContent(bubble, message, isSender);
     } else if (messageType === "voice") {
         renderVoiceContent(bubble, message);
     } else {
@@ -1021,22 +1032,45 @@ function renderImageContent(bubble, message, isSender) {
     bubble.appendChild(container);
 }
 
+function renderExpiredMediaState(container, iconName, label) {
+    container.style.cssText = "width:200px;height:160px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:13px;gap:6px;";
+    container.innerHTML = `<span class="material-icons">${iconName}</span> ${label}`;
+}
+
 // --- Video content ---
-function renderVideoContent(bubble, message) {
+function renderVideoContent(bubble, message, isSender) {
     const container = document.createElement("div");
     container.className = "message-video-container";
-    container.style.cssText = "position:relative;width:200px;height:150px;background:#1e293b;border-radius:8px;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;";
+    const viewOnce = message.view_once || false;
+    const viewedBy = message.viewed_by || [];
+    const hasViewed = viewedBy.includes(state.currentUserEmail);
+    const wasOpened = viewedBy.length > 0;
 
-    container.innerHTML = `
-    <span class="material-icons" style="font-size:40px;color:var(--text-secondary)">video_file</span>
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-      width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,0.65);
-      display:flex;align-items:center;justify-content:center;">
-      <span class="material-icons" style="color:white;font-size:28px">play_arrow</span>
-    </div>
-  `;
+    if (viewOnce && (hasViewed || (isSender && wasOpened))) {
+        renderExpiredMediaState(container, "videocam", isSender ? "Opened" : "Viewed");
+    } else if (viewOnce && isSender && !wasOpened) {
+        renderExpiredMediaState(container, "send", "Sent");
+    } else {
+        container.style.cssText = "position:relative;width:200px;height:150px;background:#1e293b;border-radius:8px;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;";
+        container.innerHTML = `
+        <span class="material-icons" style="font-size:40px;color:var(--text-secondary)">video_file</span>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+          width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,0.65);
+          display:flex;align-items:center;justify-content:center;">
+          <span class="material-icons" style="color:white;font-size:28px">play_arrow</span>
+        </div>
+      `;
 
-    container.onclick = () => openVideoViewer(message.video_url);
+        if (viewOnce && !isSender && !hasViewed) {
+            const overlay = document.createElement("div");
+            overlay.className = "view-once-overlay";
+            overlay.innerHTML = '<span class="material-icons" style="font-size:14px">lock</span> View once';
+            container.appendChild(overlay);
+        }
+
+        container.onclick = () => openVideoViewer(message.id, message.video_url, viewOnce, viewedBy, message.sender);
+    }
+
     bubble.appendChild(container);
 }
 
@@ -1071,10 +1105,10 @@ function renderVoiceContent(bubble, message) {
     let audio = null;
     let isPlaying = false;
 
-    playBtn.onclick = async () => {
+    async function ensureVoiceAudio() {
         if (!audio) {
             const url = await getSignedUrl("voice-messages", message.voice_url);
-            if (!url) return;
+            if (!url) return null;
             audio = new Audio(url);
 
             audio.onloadedmetadata = () => {
@@ -1101,24 +1135,31 @@ function renderVoiceContent(bubble, message) {
                 playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
             };
         }
+        return audio;
+    }
+
+    playBtn.onclick = async () => {
+        const readyAudio = await ensureVoiceAudio();
+        if (!readyAudio) return;
 
         if (isPlaying) {
-            audio.pause();
+            readyAudio.pause();
             isPlaying = false;
             playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
         } else {
-            await audio.play();
+            await readyAudio.play();
             isPlaying = true;
             playBtn.innerHTML = '<span class="material-icons">pause</span>';
         }
     };
 
-    seekbar.oninput = () => {
-        if (!audio) return;
-        audio.currentTime = Number(seekbar.value || 0);
-        const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+    seekbar.oninput = async () => {
+        const readyAudio = await ensureVoiceAudio();
+        if (!readyAudio) return;
+        readyAudio.currentTime = Number(seekbar.value || 0);
+        const pct = readyAudio.duration ? (readyAudio.currentTime / readyAudio.duration) * 100 : 0;
         progress.style.width = pct + "%";
-        durationEl.textContent = formatDuration(audio.currentTime);
+        durationEl.textContent = formatDuration(readyAudio.currentTime);
     };
 
     wrapper.appendChild(playBtn);
@@ -1158,8 +1199,15 @@ function scrollToMessage(messageId) {
 
 function addSwipeToReply(bubble, messageId) {
     let startX = 0, curX = 0, active = false;
+    const isInteractiveTarget = (target) => {
+        return !!target?.closest("input, button, textarea, audio, video, a, .voice-waveform, .voice-message");
+    };
 
     bubble.addEventListener("touchstart", (e) => {
+        if (isInteractiveTarget(e.target)) {
+            active = false;
+            return;
+        }
         startX = e.touches[0].clientX;
         active = true;
         bubble.style.transition = "";
@@ -1172,7 +1220,12 @@ function addSwipeToReply(bubble, messageId) {
         if (diff > 0 && diff < 80) bubble.style.transform = `translateX(${diff}px)`;
     }, { passive: true });
 
-    bubble.addEventListener("touchend", () => {
+    bubble.addEventListener("touchend", (e) => {
+        if (isInteractiveTarget(e.target)) {
+            active = false;
+            curX = 0;
+            return;
+        }
         const diff = curX - startX;
         bubble.style.transition = "transform 0.2s ease";
         bubble.style.transform = "";
@@ -1262,6 +1315,17 @@ function updateFloatingDate() {
 function showChatScreen() {
     document.getElementById("login").style.display = "none";
     document.getElementById("chat").style.display = "flex";
+}
+
+function updateMessageViewedState(messageId, viewerId = state.currentUserEmail) {
+    const message = state.allMessages.find(entry => entry.id === messageId);
+    if (!message) return;
+
+    const viewedBy = Array.isArray(message.viewed_by) ? message.viewed_by.slice() : [];
+    if (!viewedBy.includes(viewerId)) {
+        viewedBy.push(viewerId);
+        message.viewed_by = viewedBy;
+    }
 }
 
 function updateConnectionStatus(status) {
@@ -1633,6 +1697,7 @@ window.handleVideoSelect = function (event) {
     state.selectedVideo = file;
     const videoEl = document.getElementById("preview-video");
     videoEl.src = URL.createObjectURL(file);
+    document.getElementById("video-view-once-checkbox").checked = false;
     document.getElementById("video-preview-modal").style.display = "flex";
     event.target.value = "";
 };
@@ -1641,15 +1706,18 @@ window.cancelVideoSend = function () {
     state.selectedVideo = null;
     const v = document.getElementById("preview-video");
     v.pause(); v.src = "";
+    document.getElementById("video-view-once-checkbox").checked = false;
     document.getElementById("video-preview-modal").style.display = "none";
 };
 
 window.confirmVideoSend = async function () {
     if (!state.selectedVideo) return;
     const file = state.selectedVideo;
+    const viewOnce = document.getElementById("video-view-once-checkbox").checked;
     state.selectedVideo = null;
 
     document.getElementById("video-preview-modal").style.display = "none";
+    document.getElementById("video-view-once-checkbox").checked = false;
     updateConnectionStatus("loading");
 
     try {
@@ -1669,6 +1737,8 @@ window.confirmVideoSend = async function () {
                 text: null,
                 message_type: "video",
                 video_url: filePath,
+                view_once: viewOnce,
+                viewed_by: [],
                 read: false
             }])
             .select()
@@ -1683,7 +1753,7 @@ window.confirmVideoSend = async function () {
         scrollToBottom(true);
         await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-        myLoveNotify("sent a video 🎥");
+        myLoveNotify(`sent ${viewOnce ? "a view-once video 🔒" : "a video 🎥"}`);
 
         updateConnectionStatus("connected");
     } catch (err) {
@@ -1693,7 +1763,10 @@ window.confirmVideoSend = async function () {
     }
 };
 
-window.openVideoViewer = async function (videoPath) {
+window.openVideoViewer = async function (messageId, videoPath, viewOnce, viewedBy, senderEmail) {
+    const hasViewed = (viewedBy || []).includes(state.currentUserEmail);
+    if (viewOnce && hasViewed) return;
+
     try {
         const url = await getSignedUrl("chat-videos", videoPath);
         if (!url) throw new Error("No URL");
@@ -1702,6 +1775,33 @@ window.openVideoViewer = async function (videoPath) {
         v.src = url;
         document.getElementById("video-viewer-modal").style.display = "flex";
         v.play();
+
+        if (viewOnce && !hasViewed) {
+            const nextViewedBy = [...(viewedBy || []), state.currentUserEmail];
+            const { error } = await state.supabaseClient
+                .from("chat_messages")
+                .update({ viewed_by: nextViewedBy })
+                .eq("id", messageId);
+            if (error) throw error;
+
+            updateMessageViewedState(messageId, state.currentUserEmail);
+
+            setTimeout(() => {
+                const el = document.querySelector(`[data-message-id="${messageId}"]`);
+                if (el) {
+                    const c = el.querySelector(".message-video-container");
+                    if (c) renderExpiredMediaState(c, "videocam", "Viewed");
+                }
+            }, 100);
+
+            if (state.channel) {
+                state.channel.send({ type: "broadcast", event: "video-viewed", payload: { messageId, viewerId: state.currentUserEmail } });
+            }
+
+            myLoveNotify(`opened ${USER_NAMES[senderEmail] || senderEmail}'s view-once video 👀`);
+            return;
+        }
+
         myLoveNotify("opened a video 🎬");
     } catch (err) {
         console.error("openVideoViewer:", err);

@@ -828,6 +828,14 @@ body:not([data-theme="classic"]) .theme-toggle-btn {
   cursor: pointer;
 }
 
+.voice-seekbar {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+}
+
 .voice-seekbar::-webkit-slider-thumb,
 .voice-preview-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
