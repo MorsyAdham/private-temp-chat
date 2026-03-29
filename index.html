@@ -5,6 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Private Chat Room</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <!-- Inline favicon, no external file needed -->
     <link rel="icon"
@@ -41,6 +46,10 @@
                     </div>
                 </div>
                 <div class="header-actions">
+                    <button id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme">
+                        <span id="theme-toggle-emoji" class="theme-toggle-emoji">💕</span>
+                        <span id="theme-toggle-label" class="theme-toggle-label">Midnight Cute</span>
+                    </button>
                     <button id="todo-btn" class="icon-btn todo" onclick="openTodoModal()" title="Daily Checklist">
                         <span class="material-icons">favorite</span>
                     </button>
@@ -49,9 +58,6 @@
                     </button>
                     <button id="reload-btn" class="icon-btn" onclick="reloadChat()" title="Reload">
                         <span class="material-icons">refresh</span>
-                    </button>
-                    <button id="panic-btn" class="icon-btn panic" onclick="panic()" title="Panic Mode">
-                        <span class="material-icons">visibility_off</span>
                     </button>
                 </div>
             </div>
@@ -125,14 +131,30 @@
 
             <!-- Voice Recording Indicator -->
             <div id="voice-recording" class="voice-recording" style="display: none;">
-                <div class="recording-animation">
+                <button id="voice-preview-play" class="voice-play-btn voice-preview-play" onclick="toggleVoicePreviewPlayback()"
+                    style="display: none;">
+                    <span class="material-icons">play_arrow</span>
+                </button>
+                <div id="voice-recording-indicator" class="recording-animation">
                     <span class="material-icons pulse">mic</span>
                 </div>
-                <span id="recording-time">0:00</span>
+                <div class="voice-recording-main">
+                    <span id="recording-time">0:00</span>
+                    <input id="voice-preview-slider" class="voice-preview-slider" type="range" min="0" max="0" step="0.1"
+                        value="0" style="display: none;" oninput="seekVoicePreview(event)">
+                    <div id="voice-preview-times" class="voice-preview-times" style="display: none;">
+                        <span id="voice-preview-current">0:00</span>
+                        <span id="voice-preview-total">0:00</span>
+                    </div>
+                </div>
                 <button onclick="cancelVoiceRecording()" class="icon-btn-small">
                     <span class="material-icons">delete</span>
                 </button>
-                <button onclick="sendVoiceRecording()" class="icon-btn-small primary">
+                <button id="voice-finish-btn" onclick="finishVoiceRecording()" class="icon-btn-small primary">
+                    <span class="material-icons">stop</span>
+                </button>
+                <button id="voice-send-btn" onclick="sendVoiceRecording()" class="icon-btn-small primary"
+                    style="display: none;">
                     <span class="material-icons">send</span>
                 </button>
             </div>

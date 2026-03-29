@@ -1,27 +1,27 @@
-# Aya Daily Todo Popup
+# My Love Daily Todo Popup
 
 ## Goal
-Add a popup checklist for Aya that Adham controls. Adham creates the list items, Aya can only check or uncheck them, and the same list resets every 24 hours so it becomes a fresh daily routine.
+Add a popup checklist for My Love that Nobody controls. Nobody creates the list items, My Love can only check or uncheck them, and the same list resets every 24 hours so it becomes a fresh daily routine.
 
 ## Daily Checklist Content
-Use this exact default list for Aya's daily popup:
+Use this exact default list for My Love's daily popup:
 
-1. Put your medicine in your bag
-2. Eat a good breakfast
-3. Take your morning medicine
-4. Enjoy your coffee
-5. Have lunch
-6. Finish your work
-7. Head home safely
-8. Order your food
-9. Get a big bottle of water
-10. Go into your room
-11. Lock the door securely
-12. Drink some water
-13. Eat your meal
-14. Take your evening medicine
-15. Double-check the door is locked
-16. Get some rest and go to sleep
+1. 💊 Put your medicine in your bag
+2. 🥐 Eat a good breakfast
+3. 🌞 Take your morning medicine
+4. ☕ Enjoy your coffee
+5. 🍱 Have lunch
+6. 💼 Finish your work
+7. 🏡 Head home safely
+8. 🛍️ Order your food
+9. 🍼 Get a big bottle of water
+10. 🚪 Go into your room
+11. 🔒 Lock the door securely
+12. 💧 Drink some water
+13. 🍽️ Eat your meal
+14. 🌙 Take your evening medicine
+15. 🔐 Double-check the door is locked
+16. 😴 Get some rest and go to sleep
 
 Popup heading:
 - `🌸 Daily Checklist`
@@ -30,22 +30,22 @@ Encouragement message after each completed task:
 - `Good job baby 💕 Im so proud of you, keep going youre doing amazing 💕`
 
 ## How It Should Work
-1. Adham defines the master list of daily tasks.
-2. When Aya logs in, a popup opens with today’s checklist.
-3. Aya can mark items as done, but she cannot rename, add, or delete tasks.
+1. Nobody defines the master list of daily tasks.
+2. When My Love logs in, a popup opens with today’s checklist.
+3. My Love can mark items as done, but she cannot rename, add, or delete tasks.
 4. Every check triggers an encouragement message.
 5. At the end of the day, the app calculates progress, score, and reward tier.
 6. After 24 hours, the checklist resets back to unchecked using the same master items.
 
 ## Roles
-- Adham: can create, edit, reorder, add, or remove master tasks.
-- Aya: can only toggle `done` on today’s copy of the tasks.
+- Nobody: can create, edit, reorder, add, or remove master tasks.
+- My Love: can only toggle `done` on today’s copy of the tasks.
 
 ## Recommended UI
 - Add a new modal similar to the existing popup pattern in `index.html`.
 - Place a new header button beside Search and Reload, for example `todo-btn`, using the same circular icon-button style.
 - Show:
-  - title: `💕 Aya's Daily List 💕`
+  - title: `💕 My Love's Daily List 💕`
   - current progress: `3 / 7 done`
   - checklist items with checkboxes
   - score and reward preview at the bottom
@@ -65,7 +65,7 @@ The popup should feel cute, warm, and romantic rather than corporate.
 Suggested text layout:
 
 ```text
-💕 Aya's Daily List 💕
+💕 My Love's Daily List 💕
 3 / 7 done today
 [ ] Drink enough water
 [x] Take vitamins
@@ -93,22 +93,22 @@ Use 2 layers: a master template and a daily progress record.
     "targetUser": "ayaessam487@gmail.com",
     "title": "🌸 Daily Checklist",
     "items": [
-      { "id": "put-medicine-in-bag", "text": "Put your medicine in your bag", "order": 1, "active": true },
-      { "id": "eat-breakfast", "text": "Eat a good breakfast", "order": 2, "active": true },
-      { "id": "take-morning-medicine", "text": "Take your morning medicine", "order": 3, "active": true },
-      { "id": "enjoy-coffee", "text": "Enjoy your coffee", "order": 4, "active": true },
-      { "id": "have-lunch", "text": "Have lunch", "order": 5, "active": true },
-      { "id": "finish-work", "text": "Finish your work", "order": 6, "active": true },
-      { "id": "head-home-safely", "text": "Head home safely", "order": 7, "active": true },
-      { "id": "order-food", "text": "Order your food", "order": 8, "active": true },
-      { "id": "get-big-bottle-of-water", "text": "Get a big bottle of water", "order": 9, "active": true },
-      { "id": "go-into-room", "text": "Go into your room", "order": 10, "active": true },
-      { "id": "lock-door-securely", "text": "Lock the door securely", "order": 11, "active": true },
-      { "id": "drink-some-water", "text": "Drink some water", "order": 12, "active": true },
-      { "id": "eat-meal", "text": "Eat your meal", "order": 13, "active": true },
-      { "id": "take-evening-medicine", "text": "Take your evening medicine", "order": 14, "active": true },
-      { "id": "double-check-door-locked", "text": "Double-check the door is locked", "order": 15, "active": true },
-      { "id": "rest-and-sleep", "text": "Get some rest and go to sleep", "order": 16, "active": true }
+      { "id": "put-medicine-in-bag", "text": "Put your medicine in your bag", "emoji": "💊", "order": 1, "active": true },
+      { "id": "eat-breakfast", "text": "Eat a good breakfast", "emoji": "🥐", "order": 2, "active": true },
+      { "id": "take-morning-medicine", "text": "Take your morning medicine", "emoji": "🌞", "order": 3, "active": true },
+      { "id": "enjoy-coffee", "text": "Enjoy your coffee", "emoji": "☕", "order": 4, "active": true },
+      { "id": "have-lunch", "text": "Have lunch", "emoji": "🍱", "order": 5, "active": true },
+      { "id": "finish-work", "text": "Finish your work", "emoji": "💼", "order": 6, "active": true },
+      { "id": "head-home-safely", "text": "Head home safely", "emoji": "🏡", "order": 7, "active": true },
+      { "id": "order-food", "text": "Order your food", "emoji": "🛍️", "order": 8, "active": true },
+      { "id": "get-big-bottle-of-water", "text": "Get a big bottle of water", "emoji": "🍼", "order": 9, "active": true },
+      { "id": "go-into-room", "text": "Go into your room", "emoji": "🚪", "order": 10, "active": true },
+      { "id": "lock-door-securely", "text": "Lock the door securely", "emoji": "🔒", "order": 11, "active": true },
+      { "id": "drink-some-water", "text": "Drink some water", "emoji": "💧", "order": 12, "active": true },
+      { "id": "eat-meal", "text": "Eat your meal", "emoji": "🍽️", "order": 13, "active": true },
+      { "id": "take-evening-medicine", "text": "Take your evening medicine", "emoji": "🌙", "order": 14, "active": true },
+      { "id": "double-check-door-locked", "text": "Double-check the door is locked", "emoji": "🔐", "order": 15, "active": true },
+      { "id": "rest-and-sleep", "text": "Get some rest and go to sleep", "emoji": "😴", "order": 16, "active": true }
     ]
   }
 }
@@ -139,17 +139,17 @@ Use 2 layers: a master template and a daily progress record.
 - Do not delete the old day; keep it for history if you want streaks later.
 
 ## Current Implementation
-The current app version stores Aya's daily progress in browser `localStorage` under a single daily record key. That means:
+The current app version stores My Love's daily progress in browser `localStorage` under a single daily record key. That means:
 
 - the checklist resets by local browser date
-- Aya can only toggle items through the UI
+- My Love can only toggle items through the UI
 - task text is fixed in `app.js`
 - progress is device/browser-specific for now
 
 If you want progress to sync across devices later, move the daily record into Supabase.
 
 ## Encouragement Messages
-Send this exact message every time Aya checks an item:
+Send this exact message every time My Love checks an item:
 
 - `Good job baby 💕 Im so proud of you, keep going youre doing amazing 💕`
 
@@ -182,10 +182,10 @@ Use a sweeter summary message based on completion level.
 2. Add popup styles in `style.css`.
 3. Add `todoTemplate` and `todoToday` state in `app.js`.
 4. Store template and daily records in Supabase.
-5. Restrict template editing to Adham’s email only.
-6. Restrict daily checkbox toggling to Aya’s email only.
+5. Restrict template editing to Nobody’s email only.
+6. Restrict daily checkbox toggling to My Love’s email only.
 7. Trigger encouragement on every new check.
-8. Run the summary logic when the day changes or when Aya logs out after midnight.
+8. Run the summary logic when the day changes or when My Love logs out after midnight.
 
 ## Supabase Upgrade Path
 If you want to upgrade the current local version to a synced backend version later, use tables like:
@@ -212,4 +212,4 @@ If you want to upgrade the current local version to a synced backend version lat
   - `updated_at`
 
 ## Important Rule
-Aya must never be able to edit the task text itself from the browser. Only the completion state for today should be writable by her account.
+My Love must never be able to edit the task text itself from the browser. Only the completion state for today should be writable by her account.

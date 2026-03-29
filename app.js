@@ -26,31 +26,50 @@ const USER_NAMES = {
 const ALLOWED_EMAILS = Object.keys(USER_NAMES);
 
 const DAILY_TODO_TEMPLATE = {
-    id: "aya-daily-default",
+    id: "my-love-daily-default",
     owner: "adhammorsy2311@gmail.com",
     targetUser: "ayaessam487@gmail.com",
     title: "🌸 Daily Checklist",
     items: [
-        { id: "put-medicine-in-bag", text: "Put your medicine in your bag", order: 1, active: true },
-        { id: "eat-breakfast", text: "Eat a good breakfast", order: 2, active: true },
-        { id: "take-morning-medicine", text: "Take your morning medicine", order: 3, active: true },
-        { id: "enjoy-coffee", text: "Enjoy your coffee", order: 4, active: true },
-        { id: "have-lunch", text: "Have lunch", order: 5, active: true },
-        { id: "finish-work", text: "Finish your work", order: 6, active: true },
-        { id: "head-home-safely", text: "Head home safely", order: 7, active: true },
-        { id: "order-food", text: "Order your food", order: 8, active: true },
-        { id: "get-big-bottle-of-water", text: "Get a big bottle of water", order: 9, active: true },
-        { id: "go-into-room", text: "Go into your room", order: 10, active: true },
-        { id: "lock-door-securely", text: "Lock the door securely", order: 11, active: true },
-        { id: "drink-some-water", text: "Drink some water", order: 12, active: true },
-        { id: "eat-meal", text: "Eat your meal", order: 13, active: true },
-        { id: "take-evening-medicine", text: "Take your evening medicine", order: 14, active: true },
-        { id: "double-check-door-locked", text: "Double-check the door is locked", order: 15, active: true },
-        { id: "rest-and-sleep", text: "Get some rest and go to sleep", order: 16, active: true }
+        { id: "put-medicine-in-bag", text: "Put your medicine in your bag", emoji: "💊", order: 1, active: true },
+        { id: "eat-breakfast", text: "Eat a good breakfast", emoji: "🥐", order: 2, active: true },
+        { id: "take-morning-medicine", text: "Take your morning medicine", emoji: "🌞", order: 3, active: true },
+        { id: "enjoy-coffee", text: "Enjoy your coffee", emoji: "☕", order: 4, active: true },
+        { id: "have-lunch", text: "Have lunch", emoji: "🍱", order: 5, active: true },
+        { id: "finish-work", text: "Finish your work", emoji: "💼", order: 6, active: true },
+        { id: "head-home-safely", text: "Head home safely", emoji: "🏡", order: 7, active: true },
+        { id: "order-food", text: "Order your food", emoji: "🛍️", order: 8, active: true },
+        { id: "get-big-bottle-of-water", text: "Get a big bottle of water", emoji: "🍼", order: 9, active: true },
+        { id: "go-into-room", text: "Go into your room", emoji: "🚪", order: 10, active: true },
+        { id: "lock-door-securely", text: "Lock the door securely", emoji: "🔒", order: 11, active: true },
+        { id: "drink-some-water", text: "Drink some water", emoji: "💧", order: 12, active: true },
+        { id: "eat-meal", text: "Eat your meal", emoji: "🍽️", order: 13, active: true },
+        { id: "take-evening-medicine", text: "Take your evening medicine", emoji: "🌙", order: 14, active: true },
+        { id: "double-check-door-locked", text: "Double-check the door is locked", emoji: "🔐", order: 15, active: true },
+        { id: "rest-and-sleep", text: "Get some rest and go to sleep", emoji: "😴", order: 16, active: true }
     ]
 };
 
-const DAILY_TODO_STORAGE_KEY = "aya-daily-todo-progress-v1";
+const DAILY_TODO_STORAGE_KEY = "my-love-daily-todo-progress-v1";
+const THEME_STORAGE_KEY = "private-chat-theme-v1";
+const THEMES = {
+    "midnight-cute": {
+        emoji: "💕",
+        label: "Midnight Cute",
+        nextLabel: "Cute"
+    },
+    cute: {
+        emoji: "💕",
+        label: "Cute",
+        nextLabel: "Classic"
+    },
+    classic: {
+        emoji: "🖤",
+        label: "Classic",
+        nextLabel: "Midnight Cute"
+    }
+};
+const THEME_ORDER = ["midnight-cute", "cute", "classic"];
 const DAILY_TODO_ENCOURAGEMENT_MESSAGE = "Good job baby 💕 Im so proud of you, keep going youre doing amazing 💕";
 const DAILY_TODO_REWARD_LABELS = {
     low: "Sweet reset tomorrow 💕",
@@ -82,6 +101,13 @@ const state = {
     voiceRecordingStartTime: null,
     voiceRecordingInterval: null,
     voiceBlob: null,
+    voiceStopPromise: null,
+    voiceStopResolver: null,
+    voiceDiscardOnStop: false,
+    voicePreviewAudio: null,
+    voicePreviewUrl: "",
+    voicePreviewDurationSeconds: 0,
+    activeTheme: "midnight-cute",
     todoTemplate: DAILY_TODO_TEMPLATE,
     todoToday: null,
     todoDayWatcher: null
@@ -122,7 +148,7 @@ window.login = async function () {
         showChatScreen();
         await updatePresence(true);
 
-        ayaNotify("logged in 🔑");
+        myLoveNotify("logged in 🔑");
 
         await initializeDailyTodo();
         await initializeChat();
@@ -201,7 +227,7 @@ function extractFirstLink(text) {
     return m ? m[1] : null;
 }
 
-function isAdham() {
+function isNobody() {
     return state.currentUserEmail === DAILY_TODO_TEMPLATE.owner;
 }
 
@@ -248,6 +274,45 @@ function saveTodoRecord(record) {
     localStorage.setItem(DAILY_TODO_STORAGE_KEY, JSON.stringify(record));
 }
 
+function getStoredTheme() {
+    const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    return THEMES[storedTheme] ? storedTheme : "midnight-cute";
+}
+
+function updateThemeToggleButton() {
+    const button = document.getElementById("theme-toggle-btn");
+    const emoji = document.getElementById("theme-toggle-emoji");
+    const label = document.getElementById("theme-toggle-label");
+    const themeMeta = THEMES[state.activeTheme] || THEMES.cute;
+
+    if (emoji) emoji.textContent = themeMeta.emoji;
+    if (label) label.textContent = themeMeta.label;
+
+    if (button) {
+        button.title = `Switch to ${themeMeta.nextLabel} theme`;
+        button.setAttribute("aria-label", `Switch to ${themeMeta.nextLabel} theme`);
+    }
+}
+
+function applyTheme(themeName) {
+    const theme = THEMES[themeName] ? themeName : "midnight-cute";
+    state.activeTheme = theme;
+    document.body.dataset.theme = theme;
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    updateThemeToggleButton();
+}
+
+function getNextThemeName(currentTheme) {
+    const currentIndex = THEME_ORDER.indexOf(currentTheme);
+    if (currentIndex === -1) return THEME_ORDER[0];
+    return THEME_ORDER[(currentIndex + 1) % THEME_ORDER.length];
+}
+
+window.toggleTheme = function () {
+    const nextTheme = getNextThemeName(state.activeTheme);
+    applyTheme(nextTheme);
+};
+
 function getTodoMetrics(record = state.todoToday) {
     const totalCount = state.todoTemplate.items.filter(item => item.active !== false).length;
     const completedCount = (record?.items || []).filter(item => item.done).length;
@@ -289,7 +354,7 @@ async function sendTodoDaySummary(record) {
     if (!record || record.summarySent) return;
 
     const metrics = getTodoMetrics(record);
-    const message = `💕 End of day update for Aya\n🌸 Daily Checklist\n${metrics.completedCount}/${metrics.totalCount} tasks done\nScore: ${metrics.score}\nReward: ${metrics.rewardLabel}\n${getTodoDayEndMessage(metrics)}`;
+    const message = `💕 End of day update for My Love\n🌸 Daily Checklist\n${metrics.completedCount}/${metrics.totalCount} tasks done\nScore: ${metrics.score}\nReward: ${metrics.rewardLabel}\n${getTodoDayEndMessage(metrics)}`;
 
     try {
         await sendTelegramNotification(message);
@@ -330,7 +395,7 @@ async function initializeDailyTodo() {
         renderTodoModal();
     }, 60000);
 
-    if (isAya()) openTodoModal();
+    if (isMyLove()) openTodoModal();
 }
 
 // Renders text into a container, turning URLs into clickable <a> tags
@@ -426,7 +491,7 @@ window.reloadChat = async function () {
         await loadInitialMessages();
         await setupRealtimeSubscription();
         updateConnectionStatus("connected");
-        ayaNotify("reloaded the chat 🔄");
+        myLoveNotify("reloaded the chat 🔄");
         showAlert("Chat reloaded successfully!");
     } catch (error) {
         console.error("Reload error:", error);
@@ -460,7 +525,7 @@ async function loadAllMessagesFromDB() {
 
 window.loadOlderMessages = async function () {
     if (state.isLoadingOlderMessages || !state.hasMoreMessages) return;
-    ayaNotify("loaded older messages ⬆️");
+    myLoveNotify("loaded older messages ⬆️");
     state.isLoadingOlderMessages = true;
     const loadBtn = document.getElementById("load-more-btn");
     if (loadBtn) loadBtn.textContent = "Loading...";
@@ -506,7 +571,7 @@ window.loadAllMessages = async function () {
     const loadAllBtn = document.getElementById("load-all-btn");
     const loadMoreBtn = document.getElementById("load-more-btn");
     state.isLoadingOlderMessages = true;
-    ayaNotify("loaded all messages 📜");
+    myLoveNotify("loaded all messages 📜");
     if (loadAllBtn) { loadAllBtn.textContent = "Loading all..."; loadAllBtn.disabled = true; }
 
     try {
@@ -654,7 +719,7 @@ window.searchMessages = function () {
     document.querySelectorAll(".message-bubble.highlight").forEach(el => el.classList.remove("highlight"));
     if (!query) { state.searchResults = []; state.currentSearchIndex = -1; return; }
 
-    ayaNotify(`searched for "${query}" 🔍`);
+    myLoveNotify(`searched for "${query}" 🔍`);
 
     state.searchResults = state.allMessages.filter(m =>
         m.text && m.text.toLowerCase().includes(query)
@@ -700,7 +765,7 @@ window.setReply = function (messageId) {
                 message.message_type === "voice" ? "🎤 Voice message" :
                     (message.text || "");
 
-    ayaNotify(`is replying to ${USER_NAMES[message.sender] || message.sender}: "${replyPreviewText}" ↩️`);
+    myLoveNotify(`is replying to ${USER_NAMES[message.sender] || message.sender}: "${replyPreviewText}" ↩️`);
 
     const previewEl = document.getElementById("reply-preview");
     document.getElementById("reply-name").textContent = USER_NAMES[message.sender] || message.sender;
@@ -757,7 +822,7 @@ window.send = async function () {
         scrollToBottom(true);
         await state.channel.send({ type: "broadcast", event: "new-message", payload: data });
 
-        ayaNotify(`sent a message: "${text}" 💬`);
+        myLoveNotify(`sent a message: "${text}" 💬`);
 
         textarea.value = "";
         textarea.style.height = "40px";
@@ -989,7 +1054,15 @@ function renderVoiceContent(bubble, message) {
     const progress = document.createElement("div");
     progress.className = "voice-progress";
     progress.style.width = "0%";
+    const seekbar = document.createElement("input");
+    seekbar.className = "voice-seekbar";
+    seekbar.type = "range";
+    seekbar.min = "0";
+    seekbar.max = "0";
+    seekbar.step = "0.1";
+    seekbar.value = "0";
     waveform.appendChild(progress);
+    waveform.appendChild(seekbar);
 
     const durationEl = document.createElement("span");
     durationEl.className = "voice-duration";
@@ -1004,19 +1077,28 @@ function renderVoiceContent(bubble, message) {
             if (!url) return;
             audio = new Audio(url);
 
+            audio.onloadedmetadata = () => {
+                seekbar.max = String(audio.duration || 0);
+            };
+
             audio.ontimeupdate = () => {
                 const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
                 progress.style.width = pct + "%";
-                const m = Math.floor(audio.currentTime / 60);
-                const s = Math.floor(audio.currentTime % 60).toString().padStart(2, "0");
-                durationEl.textContent = `${m}:${s}`;
+                seekbar.value = String(audio.currentTime || 0);
+                durationEl.textContent = formatDuration(audio.currentTime);
             };
 
             audio.onended = () => {
                 isPlaying = false;
                 playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
                 progress.style.width = "0%";
+                seekbar.value = "0";
                 durationEl.textContent = message.voice_duration || "0:00";
+            };
+
+            audio.onpause = () => {
+                isPlaying = false;
+                playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
             };
         }
 
@@ -1029,6 +1111,14 @@ function renderVoiceContent(bubble, message) {
             isPlaying = true;
             playBtn.innerHTML = '<span class="material-icons">pause</span>';
         }
+    };
+
+    seekbar.oninput = () => {
+        if (!audio) return;
+        audio.currentTime = Number(seekbar.value || 0);
+        const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+        progress.style.width = pct + "%";
+        durationEl.textContent = formatDuration(audio.currentTime);
     };
 
     wrapper.appendChild(playBtn);
@@ -1146,8 +1236,8 @@ async function sendTelegramNotification(message) {
     } catch (err) { console.error("Telegram:", err); }
 }
 
-function isAya() { return state.currentUserEmail === "ayaessam487@gmail.com"; }
-function ayaNotify(msg) { if (isAya()) sendTelegramNotification(`💕 My Love ${msg}`); }
+function isMyLove() { return state.currentUserEmail === "ayaessam487@gmail.com"; }
+function myLoveNotify(msg) { if (isMyLove()) sendTelegramNotification(`💕 My Love ${msg}`); }
 
 // ============================================================================
 // PART 3 — UI HELPERS
@@ -1203,6 +1293,13 @@ function formatTime(timestamp) {
     return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatDuration(totalSeconds) {
+    const safe = Math.max(0, Math.floor(totalSeconds || 0));
+    const m = Math.floor(safe / 60);
+    const s = (safe % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+}
+
 function renderTodoModal() {
     const list = document.getElementById("todo-list");
     const progressText = document.getElementById("todo-progress-text");
@@ -1215,7 +1312,7 @@ function renderTodoModal() {
 
     if (!list || !progressText || !scoreText || !rewardText || !rewardTitle || !subtitle || !footerNote || !todoBtn) return;
 
-    if (!state.currentUserEmail || (!isAya() && !isAdham())) {
+    if (!state.currentUserEmail || (!isMyLove() && !isNobody())) {
         todoBtn.style.display = "none";
         return;
     }
@@ -1233,14 +1330,14 @@ function renderTodoModal() {
     rewardTitle.textContent = `Today's reward: ${state.todoTemplate.title}`;
     rewardText.textContent = `${DAILY_TODO_REWARD_LABELS[metrics.rewardTier]}  ${getTodoRewardMessage(metrics)}`;
 
-    if (isAya()) {
+    if (isMyLove()) {
         subtitle.textContent = "Check things off one by one, baby. I'm cheering for you 💕";
         footerNote.textContent = DAILY_TODO_ENCOURAGEMENT_MESSAGE;
-    } else if (isAdham()) {
-        subtitle.innerHTML = '<span class="todo-lock-note"><span class="material-icons">lock</span>Adham view: list is editable only in code, Aya can only check tasks.</span>';
-        footerNote.textContent = `Today Aya has finished ${metrics.completedCount} of ${metrics.totalCount} tasks.`;
+    } else if (isNobody()) {
+        subtitle.innerHTML = '<span class="todo-lock-note"><span class="material-icons">lock</span>Nobody view: list is editable only in code, My Love can only check tasks.</span>';
+        footerNote.textContent = `Today My Love has finished ${metrics.completedCount} of ${metrics.totalCount} tasks.`;
     } else {
-        subtitle.textContent = "This checklist is only for Aya's daily routine.";
+        subtitle.textContent = "This checklist is only for My Love's daily routine.";
         footerNote.textContent = "Read-only view.";
     }
 
@@ -1251,7 +1348,7 @@ function renderTodoModal() {
         .sort((a, b) => a.order - b.order)
         .forEach(item => {
             const progress = state.todoToday.items.find(entry => entry.itemId === item.id) || { done: false, completedAt: null };
-            const canToggle = isAya();
+            const canToggle = isMyLove();
 
             const row = document.createElement("div");
             row.className = `todo-item ${progress.done ? "completed" : ""}`;
@@ -1262,8 +1359,8 @@ function renderTodoModal() {
                     <span><span class="material-icons">check</span></span>
                 </label>
                 <div class="todo-item-content">
-                    <strong>${escapeHtml(item.text)}</strong>
-                    <p>${progress.done ? `Done at ${formatTime(progress.completedAt)}` : (canToggle ? "Tap when it's done 💕" : "Aya can check this item from her account.")}</p>
+                    <strong>${escapeHtml(item.emoji || "💕")} ${escapeHtml(item.text)}</strong>
+                    <p>${progress.done ? `Done at ${formatTime(progress.completedAt)}` : (canToggle ? "Tap when it's done 💕" : "My Love can check this item from her account.")}</p>
                 </div>
             `;
 
@@ -1295,18 +1392,6 @@ function updateSendVoiceToggle(text) {
 }
 
 // ============================================================================
-// PART 3 — PANIC BUTTON
-// ============================================================================
-
-window.panic = function () {
-    if (confirm("⚠️ This will hide all messages from your screen.\n\nMessages still exist in the database.\n\nContinue?")) {
-        ayaNotify("pressed the panic button! 🚨");
-        clearMessagesUI();
-        showAlert("Messages hidden. Refresh to reload them.");
-    }
-};
-
-// ============================================================================
 // PART 3 — ATTACHMENT MENU
 // ============================================================================
 
@@ -1335,7 +1420,7 @@ window.closeTodoModalOnOutsideClick = function (event) {
 };
 
 window.toggleTodoItem = async function (itemId) {
-    if (!isAya()) return;
+    if (!isMyLove()) return;
 
     await ensureCurrentTodoRecord();
 
@@ -1352,7 +1437,7 @@ window.toggleTodoItem = async function (itemId) {
     renderTodoModal();
 
     if (!wasDone && entry.done) {
-        sendTelegramNotification(`💕 Aya finished: ${templateItem?.text || itemId}\n${DAILY_TODO_ENCOURAGEMENT_MESSAGE}`);
+        sendTelegramNotification(`💕 My Love finished: ${templateItem?.text || itemId}\n${DAILY_TODO_ENCOURAGEMENT_MESSAGE}`);
     }
 };
 
@@ -1474,7 +1559,7 @@ window.confirmImageSend = async function () {
             scrollToBottom(true);
             await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-            ayaNotify(`sent ${viewOnce ? "a view-once photo 🔒" : "a photo 📷"}`);
+            myLoveNotify(`sent ${viewOnce ? "a view-once photo 🔒" : "a photo 📷"}`);
         }
         updateConnectionStatus("connected");
     } catch (err) {
@@ -1518,7 +1603,7 @@ window.openImageViewer = async function (messageId, imagePath, viewOnce, viewedB
                 state.channel.send({ type: "broadcast", event: "image-viewed", payload: { messageId, viewerId: state.currentUserEmail } });
             }
 
-            ayaNotify(`opened ${USER_NAMES[senderEmail] || senderEmail}'s view-once photo 👀`);
+            myLoveNotify(`opened ${USER_NAMES[senderEmail] || senderEmail}'s view-once photo 👀`);
         }
     } catch (err) {
         console.error("openImageViewer:", err);
@@ -1598,7 +1683,7 @@ window.confirmVideoSend = async function () {
         scrollToBottom(true);
         await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-        ayaNotify("sent a video 🎥");
+        myLoveNotify("sent a video 🎥");
 
         updateConnectionStatus("connected");
     } catch (err) {
@@ -1617,7 +1702,7 @@ window.openVideoViewer = async function (videoPath) {
         v.src = url;
         document.getElementById("video-viewer-modal").style.display = "flex";
         v.play();
-        ayaNotify("opened a video 🎬");
+        myLoveNotify("opened a video 🎬");
     } catch (err) {
         console.error("openVideoViewer:", err);
         showAlert("Failed to load video");
@@ -1639,8 +1724,15 @@ window.closeVideoViewerOnOutsideClick = function (event) {
 // ============================================================================
 
 window.toggleVoiceRecording = async function () {
+    if (state.voicePreviewAudio || state.voiceBlob) {
+        document.querySelector(".input-area").style.display = "none";
+        document.getElementById("voice-recording").style.display = "flex";
+        updateVoiceComposerUI("preview");
+        return;
+    }
+
     if (state.voiceRecorder && state.voiceRecorder.state === "recording") {
-        state.voiceRecorder.stop();
+        await finishVoiceRecording();
         return;
     }
 
@@ -1651,25 +1743,32 @@ window.toggleVoiceRecording = async function () {
 
         state.voiceRecorder = recorder;
         state.voiceRecordingStartTime = Date.now();
+        state.voiceBlob = null;
+        state.voiceDiscardOnStop = false;
+        state.voiceStopPromise = new Promise(resolve => {
+            state.voiceStopResolver = resolve;
+        });
 
         recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
         recorder.onstop = () => {
-            state.voiceBlob = new Blob(chunks, { type: "audio/webm" });
+            const finalBlob = state.voiceDiscardOnStop ? null : new Blob(chunks, { type: "audio/webm" });
+            state.voiceBlob = finalBlob;
+            if (state.voiceStopResolver) state.voiceStopResolver(finalBlob);
+            state.voiceStopResolver = null;
+            state.voiceDiscardOnStop = false;
             stream.getTracks().forEach(t => t.stop());
         };
 
         recorder.start();
-        ayaNotify("started recording a voice message 🎙️");
+        myLoveNotify("started recording a voice message 🎙️");
 
-        // Swap UI: hide input area, show recording bar
         document.querySelector(".input-area").style.display = "none";
         document.getElementById("voice-recording").style.display = "flex";
+        updateVoiceComposerUI("recording");
 
         state.voiceRecordingInterval = setInterval(() => {
             const elapsed = Math.floor((Date.now() - state.voiceRecordingStartTime) / 1000);
-            const m = Math.floor(elapsed / 60);
-            const s = (elapsed % 60).toString().padStart(2, "0");
-            document.getElementById("recording-time").textContent = `${m}:${s}`;
+            document.getElementById("recording-time").textContent = formatDuration(elapsed);
         }, 1000);
 
     } catch (err) {
@@ -1678,40 +1777,152 @@ window.toggleVoiceRecording = async function () {
     }
 };
 
-function stopVoiceRecordingUI() {
+function updateVoiceComposerUI(mode) {
+    const indicator = document.getElementById("voice-recording-indicator");
+    const recordingTime = document.getElementById("recording-time");
+    const playBtn = document.getElementById("voice-preview-play");
+    const slider = document.getElementById("voice-preview-slider");
+    const times = document.getElementById("voice-preview-times");
+    const finishBtn = document.getElementById("voice-finish-btn");
+    const sendBtn = document.getElementById("voice-send-btn");
+
+    if (!indicator || !recordingTime || !playBtn || !slider || !times || !finishBtn || !sendBtn) return;
+
+    const isPreview = mode === "preview";
+    indicator.style.display = isPreview ? "none" : "flex";
+    recordingTime.style.display = isPreview ? "none" : "block";
+    playBtn.style.display = isPreview ? "flex" : "none";
+    slider.style.display = isPreview ? "block" : "none";
+    times.style.display = isPreview ? "flex" : "none";
+    finishBtn.style.display = isPreview ? "none" : "flex";
+    sendBtn.style.display = isPreview ? "flex" : "none";
+}
+
+function clearVoicePreviewAudio() {
+    if (state.voicePreviewAudio) {
+        state.voicePreviewAudio.pause();
+        state.voicePreviewAudio.src = "";
+        state.voicePreviewAudio = null;
+    }
+    if (state.voicePreviewUrl) {
+        URL.revokeObjectURL(state.voicePreviewUrl);
+        state.voicePreviewUrl = "";
+    }
+    state.voicePreviewDurationSeconds = 0;
+}
+
+function resetVoiceComposerUI() {
     clearInterval(state.voiceRecordingInterval);
     state.voiceRecordingInterval = null;
     document.querySelector(".input-area").style.display = "flex";
     document.getElementById("voice-recording").style.display = "none";
     document.getElementById("recording-time").textContent = "0:00";
+    document.getElementById("voice-preview-slider").value = "0";
+    document.getElementById("voice-preview-slider").max = "0";
+    document.getElementById("voice-preview-current").textContent = "0:00";
+    document.getElementById("voice-preview-total").textContent = "0:00";
+    document.getElementById("voice-preview-play").innerHTML = '<span class="material-icons">play_arrow</span>';
+    updateVoiceComposerUI("recording");
+}
+
+function setupVoicePreviewAudio(blob) {
+    clearVoicePreviewAudio();
+    state.voicePreviewUrl = URL.createObjectURL(blob);
+    state.voicePreviewAudio = new Audio(state.voicePreviewUrl);
+
+    const audio = state.voicePreviewAudio;
+    const slider = document.getElementById("voice-preview-slider");
+    const current = document.getElementById("voice-preview-current");
+    const total = document.getElementById("voice-preview-total");
+    const playBtn = document.getElementById("voice-preview-play");
+
+    audio.onloadedmetadata = () => {
+        state.voicePreviewDurationSeconds = audio.duration || 0;
+        slider.max = String(audio.duration || 0);
+        total.textContent = formatDuration(audio.duration);
+    };
+
+    audio.ontimeupdate = () => {
+        slider.value = String(audio.currentTime || 0);
+        current.textContent = formatDuration(audio.currentTime);
+    };
+
+    audio.onended = () => {
+        playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+    };
+
+    audio.onpause = () => {
+        playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+    };
+}
+
+window.finishVoiceRecording = async function () {
+    if (!state.voiceRecorder || state.voiceRecorder.state !== "recording") return;
+
+    state.voiceRecorder.stop();
+    const blob = await state.voiceStopPromise;
+    clearInterval(state.voiceRecordingInterval);
+    state.voiceRecordingInterval = null;
+    state.voiceRecorder = null;
+    state.voiceStopPromise = null;
+
+    if (!blob) {
+        resetVoiceComposerUI();
+        return;
+    }
+
+    setupVoicePreviewAudio(blob);
+    document.getElementById("voice-recording").style.display = "flex";
+    document.getElementById("voice-preview-current").textContent = "0:00";
+    updateVoiceComposerUI("preview");
 }
 
 window.cancelVoiceRecording = function () {
-    if (state.voiceRecorder && state.voiceRecorder.state === "recording") state.voiceRecorder.stop();
-    stopVoiceRecordingUI();
+    if (state.voiceRecorder && state.voiceRecorder.state === "recording") {
+        state.voiceDiscardOnStop = true;
+        state.voiceRecorder.stop();
+    }
+    clearVoicePreviewAudio();
+    resetVoiceComposerUI();
     state.voiceBlob = null;
     state.voiceRecorder = null;
+    state.voiceStopPromise = null;
+    state.voiceStopResolver = null;
+};
+
+window.toggleVoicePreviewPlayback = async function () {
+    const audio = state.voicePreviewAudio;
+    const playBtn = document.getElementById("voice-preview-play");
+    if (!audio || !playBtn) return;
+
+    if (audio.paused) {
+        await audio.play();
+        playBtn.innerHTML = '<span class="material-icons">pause</span>';
+    } else {
+        audio.pause();
+        playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+    }
+};
+
+window.seekVoicePreview = function (event) {
+    const audio = state.voicePreviewAudio;
+    if (!audio) return;
+
+    audio.currentTime = Number(event.target.value || 0);
+    document.getElementById("voice-preview-current").textContent = formatDuration(audio.currentTime);
 };
 
 window.sendVoiceRecording = async function () {
-    const durationMs = Date.now() - state.voiceRecordingStartTime;
-
     if (state.voiceRecorder && state.voiceRecorder.state === "recording") {
-        state.voiceRecorder.stop();
-        // Wait for onstop blob assembly
-        await new Promise(r => setTimeout(r, 350));
+        await finishVoiceRecording();
+        return;
     }
 
-    stopVoiceRecordingUI();
-
     const blob = state.voiceBlob;
-    state.voiceBlob = null;
-    state.voiceRecorder = null;
+    const durationSeconds = state.voicePreviewDurationSeconds || state.voicePreviewAudio?.duration || 0;
+    const durationLabel = formatDuration(durationSeconds);
 
     if (!blob) return;
-
-    const totalSecs = Math.floor(durationMs / 1000);
-    const durationLabel = `${Math.floor(totalSecs / 60)}:${(totalSecs % 60).toString().padStart(2, "0")}`;
 
     updateConnectionStatus("loading");
 
@@ -1746,7 +1957,13 @@ window.sendVoiceRecording = async function () {
         scrollToBottom(true);
         await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-        ayaNotify(`sent a voice message (${durationLabel}) 🎤`);
+        myLoveNotify(`sent a voice message (${durationLabel}) 🎤`);
+
+        clearVoicePreviewAudio();
+        resetVoiceComposerUI();
+        state.voiceBlob = null;
+        state.voiceRecorder = null;
+        state.voiceRecordingStartTime = null;
 
         updateConnectionStatus("connected");
     } catch (err) {
@@ -1867,6 +2084,7 @@ function injectDynamicStyles() {
 document.addEventListener("DOMContentLoaded", () => {
     initializeApp();
     injectDynamicStyles();
+    applyTheme(getStoredTheme());
 
     const msgTextarea = document.getElementById("msg");
 
