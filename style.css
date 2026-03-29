@@ -511,14 +511,13 @@ body:not([data-theme="classic"]) .theme-toggle-btn {
   position: sticky;
   top: 80px;
   z-index: 20;
-  margin: 12px auto 12px;
+  margin: 4px auto 8px;
   padding: 6px 12px;
   width: fit-content;
   font-size: 12px;
-  background: var(--message-bg);
+  background: transparent;
   color: var(--text-secondary);
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* ============================================================================
