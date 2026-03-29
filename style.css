@@ -252,10 +252,64 @@ input:focus {
 }
 
 .header-actions {
-  display: flex;
-  gap: 4px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 40px;
+  gap: 8px;
   align-items: center;
+  justify-content: end;
   flex-shrink: 0;
+}
+
+.header-actions > button {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.header-actions .icon-btn,
+.header-actions .theme-toggle-btn,
+.header-actions .app-view-btn {
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-secondary);
+  backdrop-filter: none;
+}
+
+.header-actions .icon-btn:hover,
+.header-actions .theme-toggle-btn:hover,
+.header-actions .app-view-btn:hover {
+  transform: none;
+  background: var(--hover);
+  color: var(--text-primary);
+}
+
+.header-actions .icon-btn.todo {
+  color: var(--primary);
+}
+
+.header-actions .icon-btn.todo:hover {
+  color: var(--primary-dark);
+}
+
+.header-actions .theme-toggle-btn {
+  color: var(--text-primary);
+}
+
+.header-actions .app-view-btn {
+  color: var(--text-primary);
+}
+
+.header-actions .theme-toggle-btn:hover,
+.header-actions .app-view-btn:hover {
+  background: var(--hover);
+}
+
+.header-actions .theme-toggle-emoji,
+.header-actions .material-icons {
+  font-size: 21px;
 }
 
 .theme-toggle-btn {
@@ -323,6 +377,20 @@ body[data-theme="classic"] .theme-toggle-btn:hover {
 
 body:not([data-theme="classic"]) .theme-toggle-btn {
   backdrop-filter: blur(14px);
+}
+
+body[data-theme="classic"] .header-actions .theme-toggle-btn,
+body:not([data-theme="classic"]) .header-actions .theme-toggle-btn,
+body.app-view-enabled .header-actions .app-view-btn {
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body.app-view-enabled .header-actions .app-view-btn {
+  background: var(--hover);
 }
 
 .theme-toggle-emoji {
@@ -491,6 +559,10 @@ body:not([data-theme="classic"]) .theme-toggle-btn {
   background: var(--chat-bg);
 }
 
+body.app-view-enabled .messages-container {
+  background: transparent;
+}
+
 .messages-container::-webkit-scrollbar {
   width: 6px;
 }
@@ -509,15 +581,34 @@ body:not([data-theme="classic"]) .theme-toggle-btn {
    ============================================================================ */
 .floating-date {
   position: sticky;
-  top: 80px;
+  top: 20px;
   z-index: 20;
-  margin: 4px auto 8px;
-  padding: 6px 12px;
-  width: fit-content;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  pointer-events: none;
+}
+
+.floating-date-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
   font-size: 12px;
-  background: transparent;
+  background: var(--message-bg);
   color: var(--text-secondary);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
+  transform: translateY(8px);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+}
+
+body.app-view-enabled .floating-date {
+  top: 6px;
 }
 
 /* ============================================================================
@@ -1519,6 +1610,10 @@ textarea:focus {
 @media (max-width: 480px) {
   .header {
     padding: 10px 12px;
+  }
+
+  .header-actions {
+    gap: 6px;
   }
 
   .header-left h2 {

@@ -351,6 +351,19 @@ function syncViewportLayout() {
     }
 }
 
+function ensureComposerVisible() {
+    const composer = document.getElementById("voice-recording")?.style.display === "flex"
+        ? document.getElementById("voice-recording")
+        : document.querySelector(".input-area");
+
+    if (!composer) return;
+
+    requestAnimationFrame(() => {
+        composer.scrollIntoView({ block: "end", inline: "nearest" });
+        scrollToBottom(false);
+    });
+}
+
 function applyAppViewLayout(enabled) {
     state.appViewEnabled = enabled;
     document.body.classList.toggle("app-view-enabled", enabled);
@@ -1371,14 +1384,15 @@ function myLoveNotify(msg) { if (isMyLove()) sendTelegramNotification(`💕 My L
 function updateFloatingDate() {
     const messagesDiv = document.getElementById("messages");
     const floatingDate = document.getElementById("floating-date");
-    if (!floatingDate) return;
+    const floatingDateLabel = floatingDate ? floatingDate.querySelector(".floating-date-label") : null;
+    if (!floatingDateLabel) return;
 
     const bubbles = messagesDiv.querySelectorAll(".message-bubble");
     for (const b of bubbles) {
         const rect = b.getBoundingClientRect();
         const containerRect = messagesDiv.getBoundingClientRect();
         if (rect.bottom > containerRect.top + 40) {
-            floatingDate.textContent = getDateLabel(b.dataset.timestamp);
+            floatingDateLabel.textContent = getDateLabel(b.dataset.timestamp);
             break;
         }
     }
@@ -2328,7 +2342,10 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("focusin", (event) => {
         if (event.target?.matches("textarea, input, [contenteditable='true']")) {
             setTimeout(syncViewportLayout, 50);
-            setTimeout(() => scrollToBottom(false), 120);
+            setTimeout(ensureComposerVisible, 80);
+            setTimeout(syncViewportLayout, 180);
+            setTimeout(ensureComposerVisible, 220);
+            setTimeout(ensureComposerVisible, 380);
         }
     });
 
