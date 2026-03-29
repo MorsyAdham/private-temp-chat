@@ -110,7 +110,6 @@ const state = {
     voicePreviewDurationSeconds: 0,
     activeTheme: "midnight-cute",
     appViewEnabled: false,
-    keyboardInset: 0,
     todoTemplate: DAILY_TODO_TEMPLATE,
     todoToday: null,
     todoDayWatcher: null
@@ -333,27 +332,21 @@ function updateAppViewButton() {
     button.setAttribute("aria-label", button.title);
 }
 
-function applyViewportMetrics(viewportHeight = window.innerHeight, keyboardInset = 0) {
+function applyViewportMetrics(viewportHeight = window.innerHeight) {
     const safeHeight = Math.max(320, Math.round(viewportHeight || window.innerHeight || 0));
-    const safeInset = Math.max(0, Math.round(keyboardInset || 0));
-    state.keyboardInset = safeInset;
     document.documentElement.style.setProperty("--app-height", `${safeHeight}px`);
-    document.documentElement.style.setProperty("--keyboard-inset", `${safeInset}px`);
 }
 
 function syncViewportLayout() {
     const vv = window.visualViewport;
     if (!vv) {
-        applyViewportMetrics(window.innerHeight, 0);
+        applyViewportMetrics(window.innerHeight);
         return;
     }
 
-    const layoutHeight = vv.height + vv.offsetTop;
-    const keyboardInset = Math.max(0, window.innerHeight - layoutHeight);
-    const effectiveInset = keyboardInset > 120 ? keyboardInset : 0;
-    applyViewportMetrics(layoutHeight, effectiveInset);
+    applyViewportMetrics(vv.height);
 
-    if (effectiveInset > 0) {
+    if (window.innerHeight - vv.height > 120) {
         requestAnimationFrame(() => scrollToBottom(false));
     }
 }
@@ -573,11 +566,9 @@ window.reloadChat = async function () {
         await setupRealtimeSubscription();
         updateConnectionStatus("connected");
         myLoveNotify("reloaded the chat 🔄");
-        showAlert("Chat reloaded successfully!");
     } catch (error) {
         console.error("Reload error:", error);
         updateConnectionStatus("disconnected");
-        showAlert("Failed to reload chat");
     }
 };
 
