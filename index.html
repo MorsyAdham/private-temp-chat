@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Private Chat Room</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Inline favicon, no external file needed -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💕</text></svg>">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+
+<body>
+    <div class="wrapper">
+        <!-- LOGIN SCREEN -->
+        <div id="login" class="container">
+            <div class="login-header">
+                <h2>💕 Just the Two of Us 💕</h2>
+                <p>Sign in to continue</p>
+            </div>
+            <form onsubmit="event.preventDefault(); login()">
+                <input type="email" id="email" placeholder="Email" autocomplete="email">
+                <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+                <button type="submit" class="btn-primary">Login</button>
+            </form>
+        </div>
+
+        <!-- CHAT SCREEN -->
+        <div id="chat" class="container" style="display: none;">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-left">
+                    <h2>Our Private Room 💕</h2>
+                    <div id="connection-status" class="status-indicator">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Disconnected</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button id="search-btn" class="icon-btn" onclick="toggleSearch()" title="Search">
+                        <span class="material-icons">search</span>
+                    </button>
+                    <button id="reload-btn" class="icon-btn" onclick="reloadChat()" title="Reload">
+                        <span class="material-icons">refresh</span>
+                    </button>
+                    <button id="panic-btn" class="icon-btn panic" onclick="panic()" title="Panic Mode">
+                        <span class="material-icons">visibility_off</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div id="search-bar" class="search-bar" style="display: none;">
+                <div class="search-input-wrapper">
+                    <span class="material-icons search-icon">search</span>
+                    <input type="text" id="search-input" placeholder="Search messages..." onkeyup="searchMessages()">
+                </div>
+                <div class="search-controls">
+                    <button onclick="searchPrevious()" class="icon-btn-small" title="Previous">
+                        <span class="material-icons">arrow_upward</span>
+                    </button>
+                    <button onclick="searchNext()" class="icon-btn-small" title="Next">
+                        <span class="material-icons">arrow_downward</span>
+                    </button>
+                    <button onclick="closeSearch()" class="icon-btn-small" title="Close">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Floating Date -->
+            <div id="floating-date" class="floating-date">Today</div>
+
+            <!-- Messages Container -->
+            <div id="messages" class="messages-container">
+                <button id="load-more-btn" class="load-btn" onclick="loadOlderMessages()">
+                    <span class="material-icons">expand_less</span>
+                    Load older messages
+                </button>
+                <button id="load-all-btn" class="load-btn" onclick="loadAllMessages()">
+                    <span class="material-icons">history</span>
+                    Load all messages
+                </button>
+            </div>
+
+            <!-- Jump to Bottom Button -->
+            <button id="jump-bottom-btn" class="jump-bottom" onclick="scrollToBottom(true)" style="display: none;">
+                <span class="material-icons">arrow_downward</span>
+            </button>
+
+            <!-- Reply Preview -->
+            <div id="reply-preview" class="reply-preview" style="display: none;">
+                <div class="reply-content">
+                    <span class="material-icons">reply</span>
+                    <div class="reply-text">
+                        <strong id="reply-name"></strong>
+                        <p id="reply-message"></p>
+                    </div>
+                </div>
+                <button onclick="cancelReply()" class="icon-btn-small">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <button class="icon-btn" onclick="openAttachmentMenu()" title="Attach">
+                    <span class="material-icons">add</span>
+                </button>
+                <textarea id="msg" placeholder="Type a message..." rows="1"></textarea>
+                <button id="send-btn" onclick="send()" class="icon-btn primary">
+                    <span class="material-icons">send</span>
+                </button>
+                <button id="voice-btn" class="icon-btn" onclick="toggleVoiceRecording()" title="Voice message">
+                    <span class="material-icons">mic</span>
+                </button>
+            </div>
+
+            <!-- Voice Recording Indicator -->
+            <div id="voice-recording" class="voice-recording" style="display: none;">
+                <div class="recording-animation">
+                    <span class="material-icons pulse">mic</span>
+                </div>
+                <span id="recording-time">0:00</span>
+                <button onclick="cancelVoiceRecording()" class="icon-btn-small">
+                    <span class="material-icons">delete</span>
+                </button>
+                <button onclick="sendVoiceRecording()" class="icon-btn-small primary">
+                    <span class="material-icons">send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attachment Menu Modal -->
+    <div id="attachment-menu" class="modal" style="display: none;">
+        <div class="modal-content attachment-menu">
+            <h3>Send</h3>
+            <div class="attachment-grid">
+                <button onclick="openCamera()" class="attachment-option">
+                    <span class="material-icons">camera_alt</span>
+                    <span>Camera</span>
+                </button>
+                <button onclick="openGallery()" class="attachment-option">
+                    <span class="material-icons">photo_library</span>
+                    <span>Gallery</span>
+                </button>
+                <button onclick="openVideoSelector()" class="attachment-option">
+                    <span class="material-icons">videocam</span>
+                    <span>Video</span>
+                </button>
+            </div>
+            <button onclick="closeAttachmentMenu()" class="btn-secondary">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div id="image-preview-modal" class="modal" style="display: none;">
+        <div class="modal-content media-preview">
+            <div class="preview-header">
+                <h3>Send Photos</h3>
+                <button onclick="cancelImageSend()" class="icon-btn">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div id="preview-images-container" class="preview-images"></div>
+            <div class="preview-options">
+                <label class="view-once-toggle">
+                    <input type="checkbox" id="view-once-checkbox">
+                    <span class="material-icons">lock</span>
+                    <span>View once</span>
+                </label>
+            </div>
+            <button onclick="confirmImageSend()" class="btn-primary full-width">
+                <span class="material-icons">send</span>
+                Send
+            </button>
+        </div>
+    </div>
+
+    <!-- Video Preview Modal -->
+    <div id="video-preview-modal" class="modal" style="display: none;">
+        <div class="modal-content media-preview">
+            <div class="preview-header">
+                <h3>Send Video</h3>
+                <button onclick="cancelVideoSend()" class="icon-btn">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <video id="preview-video" controls></video>
+            <button onclick="confirmVideoSend()" class="btn-primary full-width">
+                <span class="material-icons">send</span>
+                Send
+            </button>
+        </div>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <div id="image-viewer-modal" class="modal" style="display: none;" onclick="closeImageViewerOnOutsideClick(event)">
+        <div class="modal-content image-viewer">
+            <button class="close-viewer" onclick="closeImageViewer()">
+                <span class="material-icons">close</span>
+            </button>
+            <img id="viewer-image" src="" alt="Image">
+            <div id="viewer-info"></div>
+        </div>
+    </div>
+
+    <!-- Video Viewer Modal -->
+    <div id="video-viewer-modal" class="modal" style="display: none;" onclick="closeVideoViewerOnOutsideClick(event)">
+        <div class="modal-content video-viewer">
+            <button class="close-viewer" onclick="closeVideoViewer()">
+                <span class="material-icons">close</span>
+            </button>
+            <video id="viewer-video" controls></video>
+        </div>
+    </div>
+
+    <!-- Hidden file inputs -->
+    <input type="file" id="image-input" accept="image/*" multiple style="display: none;"
+        onchange="handleImageSelect(event)">
+    <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;"
+        onchange="handleImageSelect(event)">
+    <input type="file" id="video-input" accept="video/*" style="display: none;" onchange="handleVideoSelect(event)">
+
+    <script src="app.js"></script>
+</body>
+
+</html>
