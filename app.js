@@ -25,6 +25,40 @@ const USER_NAMES = {
 
 const ALLOWED_EMAILS = Object.keys(USER_NAMES);
 
+const DAILY_TODO_TEMPLATE = {
+    id: "aya-daily-default",
+    owner: "adhammorsy2311@gmail.com",
+    targetUser: "ayaessam487@gmail.com",
+    title: "🌸 Daily Checklist",
+    items: [
+        { id: "put-medicine-in-bag", text: "Put your medicine in your bag", order: 1, active: true },
+        { id: "eat-breakfast", text: "Eat a good breakfast", order: 2, active: true },
+        { id: "take-morning-medicine", text: "Take your morning medicine", order: 3, active: true },
+        { id: "enjoy-coffee", text: "Enjoy your coffee", order: 4, active: true },
+        { id: "have-lunch", text: "Have lunch", order: 5, active: true },
+        { id: "finish-work", text: "Finish your work", order: 6, active: true },
+        { id: "head-home-safely", text: "Head home safely", order: 7, active: true },
+        { id: "order-food", text: "Order your food", order: 8, active: true },
+        { id: "get-big-bottle-of-water", text: "Get a big bottle of water", order: 9, active: true },
+        { id: "go-into-room", text: "Go into your room", order: 10, active: true },
+        { id: "lock-door-securely", text: "Lock the door securely", order: 11, active: true },
+        { id: "drink-some-water", text: "Drink some water", order: 12, active: true },
+        { id: "eat-meal", text: "Eat your meal", order: 13, active: true },
+        { id: "take-evening-medicine", text: "Take your evening medicine", order: 14, active: true },
+        { id: "double-check-door-locked", text: "Double-check the door is locked", order: 15, active: true },
+        { id: "rest-and-sleep", text: "Get some rest and go to sleep", order: 16, active: true }
+    ]
+};
+
+const DAILY_TODO_STORAGE_KEY = "aya-daily-todo-progress-v1";
+const DAILY_TODO_ENCOURAGEMENT_MESSAGE = "Good job baby 💕 Im so proud of you, keep going youre doing amazing 💕";
+const DAILY_TODO_REWARD_LABELS = {
+    low: "Sweet reset tomorrow 💕",
+    medium: "Cute little proud-of-you reward 💕",
+    high: "Cozy praise and a lovely treat 💕",
+    perfect: "Queen of the day reward 💕"
+};
+
 // ============================================================================
 // STATE MANAGEMENT
 // ============================================================================
@@ -47,7 +81,10 @@ const state = {
     voiceRecorder: null,
     voiceRecordingStartTime: null,
     voiceRecordingInterval: null,
-    voiceBlob: null
+    voiceBlob: null,
+    todoTemplate: DAILY_TODO_TEMPLATE,
+    todoToday: null,
+    todoDayWatcher: null
 };
 
 // ============================================================================
@@ -87,6 +124,7 @@ window.login = async function () {
 
         ayaNotify("logged in 🔑");
 
+        await initializeDailyTodo();
         await initializeChat();
 
     } catch (error) {
@@ -161,6 +199,138 @@ function hasLinks(text) {
 function extractFirstLink(text) {
     const m = (text || "").match(/(https?:\/\/[^\s]+)/);
     return m ? m[1] : null;
+}
+
+function isAdham() {
+    return state.currentUserEmail === DAILY_TODO_TEMPLATE.owner;
+}
+
+function getTodayDateKey() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function createTodoRecord(dateKey = getTodayDateKey()) {
+    const items = state.todoTemplate.items
+        .filter(item => item.active !== false)
+        .sort((a, b) => a.order - b.order)
+        .map(item => ({
+            itemId: item.id,
+            done: false,
+            completedAt: null
+        }));
+
+    return {
+        templateId: state.todoTemplate.id,
+        targetUser: state.todoTemplate.targetUser,
+        dateKey,
+        items,
+        summarySent: false
+    };
+}
+
+function getStoredTodoRecord() {
+    try {
+        const raw = localStorage.getItem(DAILY_TODO_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (error) {
+        console.error("Todo parse error:", error);
+        return null;
+    }
+}
+
+function saveTodoRecord(record) {
+    state.todoToday = record;
+    localStorage.setItem(DAILY_TODO_STORAGE_KEY, JSON.stringify(record));
+}
+
+function getTodoMetrics(record = state.todoToday) {
+    const totalCount = state.todoTemplate.items.filter(item => item.active !== false).length;
+    const completedCount = (record?.items || []).filter(item => item.done).length;
+    const score = completedCount * 10 + (completedCount === totalCount && totalCount > 0 ? 20 : 0);
+    const percent = totalCount ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    let rewardTier = "low";
+    if (percent === 100) rewardTier = "perfect";
+    else if (percent >= 76) rewardTier = "high";
+    else if (percent >= 26) rewardTier = "medium";
+
+    return {
+        totalCount,
+        completedCount,
+        score,
+        percent,
+        rewardTier,
+        rewardLabel: DAILY_TODO_REWARD_LABELS[rewardTier]
+    };
+}
+
+function getTodoRewardMessage(metrics = getTodoMetrics()) {
+    if (metrics.percent === 100) return "Full score, baby. You earned the best reward today 💕";
+    if (metrics.percent >= 76) return "You're almost perfect today, habibti 💕";
+    if (metrics.percent >= 51) return "You're doing really well today and I'm proud of you 💕";
+    if (metrics.percent >= 26) return "Cute progress, keep going baby 💕";
+    return "Start with one little task, love. You can do it 💕";
+}
+
+function getTodoDayEndMessage(metrics = getTodoMetrics()) {
+    if (metrics.percent === 100) return "💕 Full score! My smart girl earned the best reward today.";
+    if (metrics.percent >= 76) return "💕 Almost perfect, superstar. That was such a lovely effort.";
+    if (metrics.percent >= 51) return "💕 You did really well today and I'm proud of you.";
+    if (metrics.percent >= 26) return "💕 Nice start my love, let's do even better tomorrow.";
+    return "💕 It's okay habibti, tomorrow is a fresh new day.";
+}
+
+async function sendTodoDaySummary(record) {
+    if (!record || record.summarySent) return;
+
+    const metrics = getTodoMetrics(record);
+    const message = `💕 End of day update for Aya\n🌸 Daily Checklist\n${metrics.completedCount}/${metrics.totalCount} tasks done\nScore: ${metrics.score}\nReward: ${metrics.rewardLabel}\n${getTodoDayEndMessage(metrics)}`;
+
+    try {
+        await sendTelegramNotification(message);
+        record.summarySent = true;
+        saveTodoRecord(record);
+    } catch (error) {
+        console.error("Todo summary error:", error);
+    }
+}
+
+async function ensureCurrentTodoRecord() {
+    if (!state.currentUserEmail) return;
+
+    const todayKey = getTodayDateKey();
+    let record = getStoredTodoRecord();
+
+    if (!record) {
+        saveTodoRecord(createTodoRecord(todayKey));
+        return;
+    }
+
+    if (record.dateKey !== todayKey) {
+        await sendTodoDaySummary(record);
+        record = createTodoRecord(todayKey);
+        saveTodoRecord(record);
+    } else {
+        state.todoToday = record;
+    }
+}
+
+async function initializeDailyTodo() {
+    await ensureCurrentTodoRecord();
+    renderTodoModal();
+
+    if (state.todoDayWatcher) clearInterval(state.todoDayWatcher);
+    state.todoDayWatcher = setInterval(async () => {
+        await ensureCurrentTodoRecord();
+        renderTodoModal();
+    }, 60000);
+
+    if (isAya()) openTodoModal();
 }
 
 // Renders text into a container, turning URLs into clickable <a> tags
@@ -1033,6 +1203,74 @@ function formatTime(timestamp) {
     return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function renderTodoModal() {
+    const list = document.getElementById("todo-list");
+    const progressText = document.getElementById("todo-progress-text");
+    const scoreText = document.getElementById("todo-score-text");
+    const rewardText = document.getElementById("todo-reward-text");
+    const rewardTitle = document.getElementById("todo-reward-title");
+    const subtitle = document.getElementById("todo-subtitle");
+    const footerNote = document.getElementById("todo-footer-note");
+    const todoBtn = document.getElementById("todo-btn");
+
+    if (!list || !progressText || !scoreText || !rewardText || !rewardTitle || !subtitle || !footerNote || !todoBtn) return;
+
+    if (!state.currentUserEmail || (!isAya() && !isAdham())) {
+        todoBtn.style.display = "none";
+        return;
+    }
+
+    todoBtn.style.display = "flex";
+
+    if (!state.todoToday) {
+        state.todoToday = createTodoRecord();
+        saveTodoRecord(state.todoToday);
+    }
+
+    const metrics = getTodoMetrics();
+    progressText.textContent = `${metrics.completedCount} / ${metrics.totalCount} done today`;
+    scoreText.textContent = `💕 ${metrics.score} points`;
+    rewardTitle.textContent = `Today's reward: ${state.todoTemplate.title}`;
+    rewardText.textContent = `${DAILY_TODO_REWARD_LABELS[metrics.rewardTier]}  ${getTodoRewardMessage(metrics)}`;
+
+    if (isAya()) {
+        subtitle.textContent = "Check things off one by one, baby. I'm cheering for you 💕";
+        footerNote.textContent = DAILY_TODO_ENCOURAGEMENT_MESSAGE;
+    } else if (isAdham()) {
+        subtitle.innerHTML = '<span class="todo-lock-note"><span class="material-icons">lock</span>Adham view: list is editable only in code, Aya can only check tasks.</span>';
+        footerNote.textContent = `Today Aya has finished ${metrics.completedCount} of ${metrics.totalCount} tasks.`;
+    } else {
+        subtitle.textContent = "This checklist is only for Aya's daily routine.";
+        footerNote.textContent = "Read-only view.";
+    }
+
+    list.innerHTML = "";
+
+    state.todoTemplate.items
+        .filter(item => item.active !== false)
+        .sort((a, b) => a.order - b.order)
+        .forEach(item => {
+            const progress = state.todoToday.items.find(entry => entry.itemId === item.id) || { done: false, completedAt: null };
+            const canToggle = isAya();
+
+            const row = document.createElement("div");
+            row.className = `todo-item ${progress.done ? "completed" : ""}`;
+
+            row.innerHTML = `
+                <label class="todo-checkbox">
+                    <input type="checkbox" ${progress.done ? "checked" : ""} ${canToggle ? "" : "disabled"} onchange="toggleTodoItem('${item.id}')">
+                    <span><span class="material-icons">check</span></span>
+                </label>
+                <div class="todo-item-content">
+                    <strong>${escapeHtml(item.text)}</strong>
+                    <p>${progress.done ? `Done at ${formatTime(progress.completedAt)}` : (canToggle ? "Tap when it's done 💕" : "Aya can check this item from her account.")}</p>
+                </div>
+            `;
+
+            list.appendChild(row);
+        });
+}
+
 function scrollToBottom(smooth = false) {
     const div = document.getElementById("messages");
     if (smooth) div.scrollTo({ top: div.scrollHeight, behavior: "smooth" });
@@ -1078,6 +1316,44 @@ window.openAttachmentMenu = function () {
 
 window.closeAttachmentMenu = function () {
     document.getElementById("attachment-menu").style.display = "none";
+};
+
+window.openTodoModal = async function () {
+    await ensureCurrentTodoRecord();
+    renderTodoModal();
+    const modal = document.getElementById("todo-modal");
+    if (modal) modal.style.display = "flex";
+};
+
+window.closeTodoModal = function () {
+    const modal = document.getElementById("todo-modal");
+    if (modal) modal.style.display = "none";
+};
+
+window.closeTodoModalOnOutsideClick = function (event) {
+    if (event.target.id === "todo-modal") closeTodoModal();
+};
+
+window.toggleTodoItem = async function (itemId) {
+    if (!isAya()) return;
+
+    await ensureCurrentTodoRecord();
+
+    const entry = state.todoToday.items.find(item => item.itemId === itemId);
+    const templateItem = state.todoTemplate.items.find(item => item.id === itemId);
+    if (!entry) return;
+
+    const wasDone = entry.done;
+    entry.done = !entry.done;
+    entry.completedAt = entry.done ? new Date().toISOString() : null;
+    state.todoToday.summarySent = false;
+
+    saveTodoRecord(state.todoToday);
+    renderTodoModal();
+
+    if (!wasDone && entry.done) {
+        sendTelegramNotification(`💕 Aya finished: ${templateItem?.text || itemId}\n${DAILY_TODO_ENCOURAGEMENT_MESSAGE}`);
+    }
 };
 
 window.openCamera = function () {
@@ -1628,6 +1904,7 @@ document.addEventListener("DOMContentLoaded", () => {
             { id: "image-preview-modal", fn: cancelImageSend },
             { id: "video-preview-modal", fn: cancelVideoSend },
             { id: "attachment-menu", fn: closeAttachmentMenu },
+            { id: "todo-modal", fn: closeTodoModal },
             { id: "search-bar", fn: closeSearch }
         ];
 
@@ -1649,4 +1926,5 @@ document.addEventListener("DOMContentLoaded", () => {
 window.addEventListener("beforeunload", async () => {
     if (state.currentUserEmail) await updatePresence(false);
     if (state.channel) state.channel.unsubscribe();
+    if (state.todoDayWatcher) clearInterval(state.todoDayWatcher);
 });

@@ -206,6 +206,15 @@ input:focus {
   background: rgba(37, 211, 102, 0.1);
 }
 
+.icon-btn.todo {
+  color: #ff8ab5;
+}
+
+.icon-btn.todo:hover {
+  background: rgba(255, 138, 181, 0.12);
+  color: #ffb3d0;
+}
+
 .icon-btn.panic {
   color: var(--danger);
 }
@@ -885,6 +894,212 @@ textarea {
 /* Media preview */
 .media-preview {
   max-width: 500px;
+}
+
+/* Daily todo modal */
+.todo-modal {
+  max-width: 460px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 138, 181, 0.18), transparent 34%),
+    radial-gradient(circle at top left, rgba(37, 211, 102, 0.14), transparent 28%),
+    linear-gradient(180deg, #18232b 0%, #10191f 100%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+}
+
+.todo-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.todo-header h3 {
+  margin: 4px 0 8px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.todo-kicker {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #ffb3d0;
+}
+
+.todo-subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.todo-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.todo-stat-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.todo-stat-card.accent {
+  background: linear-gradient(135deg, rgba(255, 138, 181, 0.16), rgba(255, 182, 193, 0.08));
+}
+
+.todo-stat-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.todo-reward-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(37, 211, 102, 0.12), rgba(255, 138, 181, 0.14));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.todo-reward-card .material-icons {
+  color: #ffd36e;
+  font-size: 24px;
+}
+
+.todo-reward-card p {
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.todo-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 179, 208, 0.24);
+}
+
+.todo-item.completed {
+  background: linear-gradient(135deg, rgba(255, 138, 181, 0.12), rgba(37, 211, 102, 0.12));
+  border-color: rgba(255, 179, 208, 0.28);
+  box-shadow: 0 10px 25px rgba(255, 138, 181, 0.08);
+}
+
+.todo-checkbox {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  margin-top: 2px;
+}
+
+.todo-checkbox input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.todo-checkbox span {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: transparent;
+  transition: all 0.18s ease;
+}
+
+.todo-checkbox input:checked + span {
+  background: linear-gradient(135deg, #ff8ab5, #25D366);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 0 0 5px rgba(255, 138, 181, 0.1);
+}
+
+.todo-checkbox input:disabled {
+  cursor: not-allowed;
+}
+
+.todo-checkbox input:disabled + span {
+  opacity: 0.75;
+}
+
+.todo-item-content {
+  flex: 1;
+}
+
+.todo-item-content strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.todo-item-content p {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.todo-item.completed .todo-item-content strong {
+  color: #ffe3ee;
+}
+
+.todo-footer {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 179, 208, 0.24);
+}
+
+.todo-footer p {
+  color: #ffdbe8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.todo-lock-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 520px) {
+  .todo-modal {
+    padding: 20px;
+  }
+
+  .todo-stats {
+    grid-template-columns: 1fr;
+  }
 }
 
 .preview-header {

@@ -41,6 +41,9 @@
                     </div>
                 </div>
                 <div class="header-actions">
+                    <button id="todo-btn" class="icon-btn todo" onclick="openTodoModal()" title="Daily Checklist">
+                        <span class="material-icons">favorite</span>
+                    </button>
                     <button id="search-btn" class="icon-btn" onclick="toggleSearch()" title="Search">
                         <span class="material-icons">search</span>
                     </button>
@@ -217,6 +220,47 @@
                 <span class="material-icons">close</span>
             </button>
             <video id="viewer-video" controls></video>
+        </div>
+    </div>
+
+    <!-- Daily Todo Modal -->
+    <div id="todo-modal" class="modal" style="display: none;" onclick="closeTodoModalOnOutsideClick(event)">
+        <div class="modal-content todo-modal">
+            <div class="todo-header">
+                <div>
+                    <p class="todo-kicker">💕 Daily love note</p>
+                    <h3>🌸 Daily Checklist 💕</h3>
+                    <p id="todo-subtitle" class="todo-subtitle">A cute little reset for today.</p>
+                </div>
+                <button onclick="closeTodoModal()" class="icon-btn">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+
+            <div class="todo-stats">
+                <div class="todo-stat-card">
+                    <span class="todo-stat-label">Progress</span>
+                    <strong id="todo-progress-text">0 / 0 done</strong>
+                </div>
+                <div class="todo-stat-card accent">
+                    <span class="todo-stat-label">Score</span>
+                    <strong id="todo-score-text">💕 0 points</strong>
+                </div>
+            </div>
+
+            <div id="todo-reward-card" class="todo-reward-card">
+                <span class="material-icons">redeem</span>
+                <div>
+                    <strong id="todo-reward-title">Today's reward</strong>
+                    <p id="todo-reward-text">Start checking things off, baby 💕</p>
+                </div>
+            </div>
+
+            <div id="todo-list" class="todo-list"></div>
+
+            <div class="todo-footer">
+                <p id="todo-footer-note">Good job baby 💕 Im so proud of you, keep going youre doing amazing 💕</p>
+            </div>
         </div>
     </div>
 
