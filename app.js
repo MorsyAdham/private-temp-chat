@@ -51,6 +51,8 @@ const DAILY_TODO_TEMPLATE = {
 };
 
 const DAILY_TODO_STORAGE_KEY = "my-love-daily-todo-progress-v1";
+const DAILY_TODO_TABLE = "daily_todo_records";
+const DAILY_TODO_SYNC_PREFIX = "__daily_todo_sync__:";
 const THEME_STORAGE_KEY = "private-chat-theme-v1";
 const APP_VIEW_STORAGE_KEY = "private-chat-app-view-v1";
 const THEMES = {
@@ -112,7 +114,8 @@ const state = {
     appViewEnabled: false,
     todoTemplate: DAILY_TODO_TEMPLATE,
     todoToday: null,
-    todoDayWatcher: null
+    todoDayWatcher: null,
+    todoSyncMode: "unknown"
 };
 
 // ============================================================================
@@ -260,11 +263,183 @@ function createTodoRecord(dateKey = getTodayDateKey()) {
     };
 }
 
+function normalizeTodoRecord(record, fallbackDateKey = getTodayDateKey()) {
+    const normalized = createTodoRecord(record?.dateKey || fallbackDateKey);
+    const sourceItems = Array.isArray(record?.items) ? record.items : [];
+
+    normalized.templateId = record?.templateId || state.todoTemplate.id;
+    normalized.targetUser = record?.targetUser || state.todoTemplate.targetUser;
+    normalized.summarySent = Boolean(record?.summarySent);
+    normalized.items = normalized.items.map(item => {
+        const match = sourceItems.find(source => (source.itemId || source.id) === item.itemId);
+        return {
+            itemId: item.itemId,
+            done: Boolean(match?.done),
+            completedAt: match?.completedAt || null
+        };
+    });
+
+    return normalized;
+}
+
+function isTodoRecordMissingError(error) {
+    return error?.code === "PGRST116";
+}
+
+function isTodoTableUnavailableError(error) {
+    return error?.code === "42P01" || /daily_todo_records/i.test(error?.message || "");
+}
+
+function mapTodoRowToRecord(row) {
+    return normalizeTodoRecord({
+        templateId: row?.template_id,
+        targetUser: row?.target_email,
+        dateKey: row?.date_key,
+        items: Array.isArray(row?.items_json) ? row.items_json : []
+    });
+}
+
+function createTodoSyncText(record) {
+    return `${DAILY_TODO_SYNC_PREFIX}${JSON.stringify(normalizeTodoRecord(record))}`;
+}
+
+function parseTodoSyncText(text) {
+    if (typeof text !== "string" || !text.startsWith(DAILY_TODO_SYNC_PREFIX)) return null;
+
+    try {
+        return normalizeTodoRecord(JSON.parse(text.slice(DAILY_TODO_SYNC_PREFIX.length)));
+    } catch (error) {
+        console.error("Todo sync message parse error:", error);
+        return null;
+    }
+}
+
+function extractTodoRecordFromMessage(message) {
+    if (!message || message.message_type !== "text") return null;
+    return parseTodoSyncText(message.text);
+}
+
+function filterVisibleMessages(messages) {
+    return (messages || []).filter(message => !extractTodoRecordFromMessage(message));
+}
+
+async function fetchTodoRecordFromChatMessages(dateKey = getTodayDateKey()) {
+    const { data, error } = await state.supabaseClient
+        .from("chat_messages")
+        .select("id, sender, text, message_type, created_at")
+        .eq("message_type", "text")
+        .like("text", `${DAILY_TODO_SYNC_PREFIX}%`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+    if (error) throw error;
+
+    const match = (data || []).find(message => {
+        const record = extractTodoRecordFromMessage(message);
+        return record?.dateKey === dateKey;
+    });
+
+    return match ? extractTodoRecordFromMessage(match) : null;
+}
+
+async function syncTodoRecordToChatMessages(record) {
+    const normalized = normalizeTodoRecord(record);
+    const { data, error } = await state.supabaseClient
+        .from("chat_messages")
+        .insert([{
+            sender: state.currentUserEmail,
+            text: createTodoSyncText(normalized),
+            message_type: "text",
+            read: true
+        }])
+        .select()
+        .single();
+
+    if (error) throw error;
+
+    state.todoSyncMode = "chat";
+    return extractTodoRecordFromMessage(data) || normalized;
+}
+
+function createTodoRowPayload(record) {
+    const normalized = normalizeTodoRecord(record);
+    const metrics = getTodoMetrics(normalized);
+
+    return {
+        template_id: state.todoTemplate.id,
+        target_email: state.todoTemplate.targetUser,
+        date_key: normalized.dateKey,
+        items_json: normalized.items,
+        score: metrics.score,
+        completed_count: metrics.completedCount,
+        total_count: metrics.totalCount,
+        reward_tier: metrics.rewardTier
+    };
+}
+
+async function fetchTodoRecordFromSupabase(dateKey = getTodayDateKey()) {
+    if (!state.supabaseClient || state.todoSyncMode === "local") return null;
+    if (state.todoSyncMode === "chat") return fetchTodoRecordFromChatMessages(dateKey);
+
+    const { data, error } = await state.supabaseClient
+        .from(DAILY_TODO_TABLE)
+        .select("template_id, target_email, date_key, items_json")
+        .eq("template_id", state.todoTemplate.id)
+        .eq("target_email", state.todoTemplate.targetUser)
+        .eq("date_key", dateKey)
+        .maybeSingle();
+
+    if (error) {
+        if (isTodoRecordMissingError(error)) return null;
+
+        if (isTodoTableUnavailableError(error)) {
+            state.todoSyncMode = "chat";
+            console.warn("Todo sync table is unavailable. Falling back to hidden chat-based checklist sync.");
+            return fetchTodoRecordFromChatMessages(dateKey);
+        }
+
+        throw error;
+    }
+
+    if (!data) {
+        state.todoSyncMode = "supabase";
+        return null;
+    }
+
+    state.todoSyncMode = "supabase";
+    return mapTodoRowToRecord(data);
+}
+
+async function syncTodoRecordToSupabase(record) {
+    if (!state.supabaseClient || state.todoSyncMode === "local") return normalizeTodoRecord(record);
+    if (state.todoSyncMode === "chat") return syncTodoRecordToChatMessages(record);
+
+    const payload = createTodoRowPayload(record);
+    const { data, error } = await state.supabaseClient
+        .from(DAILY_TODO_TABLE)
+        .upsert(payload, { onConflict: "template_id,target_email,date_key" })
+        .select("template_id, target_email, date_key, items_json")
+        .single();
+
+    if (error) {
+        if (isTodoTableUnavailableError(error)) {
+            state.todoSyncMode = "chat";
+            console.warn("Todo sync table is unavailable. Using hidden chat-based checklist sync.");
+            return syncTodoRecordToChatMessages(record);
+        }
+
+        throw error;
+    }
+
+    state.todoSyncMode = "supabase";
+    return mapTodoRowToRecord(data);
+}
+
 function getStoredTodoRecord() {
     try {
         const raw = localStorage.getItem(DAILY_TODO_STORAGE_KEY);
         if (!raw) return null;
-        return JSON.parse(raw);
+        return normalizeTodoRecord(JSON.parse(raw));
     } catch (error) {
         console.error("Todo parse error:", error);
         return null;
@@ -272,8 +447,10 @@ function getStoredTodoRecord() {
 }
 
 function saveTodoRecord(record) {
-    state.todoToday = record;
-    localStorage.setItem(DAILY_TODO_STORAGE_KEY, JSON.stringify(record));
+    const normalized = normalizeTodoRecord(record);
+    state.todoToday = normalized;
+    localStorage.setItem(DAILY_TODO_STORAGE_KEY, JSON.stringify(normalized));
+    return normalized;
 }
 
 function getStoredTheme() {
@@ -456,19 +633,33 @@ async function ensureCurrentTodoRecord() {
     if (!state.currentUserEmail) return;
 
     const todayKey = getTodayDateKey();
-    let record = getStoredTodoRecord();
+    const storedRecord = getStoredTodoRecord();
 
-    if (!record) {
-        saveTodoRecord(createTodoRecord(todayKey));
-        return;
+    if (storedRecord && storedRecord.dateKey !== todayKey) {
+        await sendTodoDaySummary(storedRecord);
     }
 
-    if (record.dateKey !== todayKey) {
-        await sendTodoDaySummary(record);
-        record = createTodoRecord(todayKey);
+    try {
+        let record = await fetchTodoRecordFromSupabase(todayKey);
+
+        if (!record) {
+            record = storedRecord?.dateKey === todayKey
+                ? storedRecord
+                : createTodoRecord(todayKey);
+
+            record = await syncTodoRecordToSupabase(record);
+        }
+
         saveTodoRecord(record);
-    } else {
-        state.todoToday = record;
+    } catch (error) {
+        console.error("Todo sync error:", error);
+
+        let record = storedRecord;
+        if (!record || record.dateKey !== todayKey) {
+            record = createTodoRecord(todayKey);
+        }
+
+        saveTodoRecord(record);
     }
 }
 
@@ -532,13 +723,13 @@ async function loadInitialMessages() {
         if (error) throw error;
         if (!data || data.length === 0) return;
 
-        // Reverse so messages render oldest → newest
-        const messages = data.reverse();
+        const messages = filterVisibleMessages(data).reverse();
+        if (!messages.length) return;
 
         state.allMessages = messages.slice();
         state.oldestMessageTimestamp = messages[0].created_at;
 
-        data.forEach(msg => renderMessage(msg));
+        messages.forEach(msg => renderMessage(msg));
         scrollToBottom(false);
         await markVisibleMessagesAsRead();
     } catch (error) {
@@ -605,7 +796,7 @@ async function loadAllMessagesFromDB() {
         if (data.length < PAGE_SIZE) break;
         from += PAGE_SIZE;
     }
-    return all;
+    return filterVisibleMessages(all);
 }
 
 window.loadOlderMessages = async function () {
@@ -629,7 +820,7 @@ window.loadOlderMessages = async function () {
         const messagesDiv = document.getElementById("messages");
         const oldScrollHeight = messagesDiv.scrollHeight;
 
-        const newMessages = data.reverse();
+        const newMessages = filterVisibleMessages(data).reverse();
         const trulyNew = newMessages.filter(m => !state.allMessages.some(e => e.id === m.id));
         if (!trulyNew.length) { updateLoadMoreButton(); return; }
 
@@ -724,6 +915,13 @@ async function setupRealtimeSubscription() {
 
     const handleNewMessage = async (message) => {
         if (!message || !message.id) return;
+        const todoRecord = extractTodoRecordFromMessage(message);
+        if (todoRecord) {
+            saveTodoRecord(todoRecord);
+            renderTodoModal();
+            return;
+        }
+
         if (state.allMessages.some(m => m.id === message.id)) return;
 
         state.allMessages.push(message);
@@ -772,6 +970,19 @@ async function setupRealtimeSubscription() {
     state.channel.on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (p) => {
         if (p.new.sender !== state.currentUserEmail) handleNewMessage(p.new);
     });
+
+    if (state.todoSyncMode === "supabase") {
+        state.channel.on("postgres_changes", { event: "*", schema: "public", table: DAILY_TODO_TABLE }, (p) => {
+            const row = p.new || p.old;
+            if (!row) return;
+            if (row.template_id !== state.todoTemplate.id) return;
+            if (row.target_email !== state.todoTemplate.targetUser) return;
+            if (row.date_key !== getTodayDateKey()) return;
+
+            saveTodoRecord(mapTodoRowToRecord(row));
+            renderTodoModal();
+        });
+    }
 
     await state.channel.subscribe((status) => {
         if (status === "SUBSCRIBED") updateConnectionStatus("connected");
@@ -1585,6 +1796,14 @@ window.toggleTodoItem = async function (itemId) {
 
     saveTodoRecord(state.todoToday);
     renderTodoModal();
+
+    try {
+        const syncedRecord = await syncTodoRecordToSupabase(state.todoToday);
+        saveTodoRecord(syncedRecord);
+        renderTodoModal();
+    } catch (error) {
+        console.error("Todo update sync error:", error);
+    }
 
     if (!wasDone && entry.done) {
         sendTelegramNotification(`💕 My Love finished: ${templateItem?.text || itemId}\n${DAILY_TODO_ENCOURAGEMENT_MESSAGE}`);
