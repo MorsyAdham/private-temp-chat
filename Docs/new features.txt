@@ -1,0 +1,11 @@
+Make the checklist in the database and allow edits to be made from adham from the system
+
+Make encouraging messages sent in chat as system messages for her to see (system messages displayed in the middle, not right or left)
+
+Make total score recorded
+
+Add something like a love streak (like snapchat)
+
+make 3 categories in the list, daily weekly, and extra love points
+
+Message reaction

@@ -24,6 +24,29 @@ const USER_NAMES = {
 };
 
 const ALLOWED_EMAILS = Object.keys(USER_NAMES);
+const TODO_CATEGORY_CONFIG = {
+    daily: {
+        label: "Daily",
+        description: "Fresh reset every day",
+        defaultPoints: 10
+    },
+    weekly: {
+        label: "Weekly",
+        description: "Carries through the current week",
+        defaultPoints: 25
+    },
+    extra: {
+        label: "Sweet Moments",
+        description: "Cute bonus points for extra effort",
+        defaultPoints: 15
+    }
+};
+const TODO_CATEGORY_ORDER = ["daily", "weekly", "extra"];
+const DEFAULT_REACTION_EMOJIS = ["❤️", "🥰", "😘", "😮", "😂", "😢"];
+const DAILY_TODO_TEMPLATE_TABLE = "daily_todo_templates";
+const TODO_REMINDER_STORAGE_KEY = "private-chat-todo-reminder-v1";
+const TODO_REMINDER_INTERVAL_MS = 3 * 60 * 60 * 1000;
+const TODO_REMINDER_MESSAGE = "💕 Gentle reminder baby: open your checklist and update it when you can 🌸";
 
 const DAILY_TODO_TEMPLATE = {
     id: "my-love-daily-default",
@@ -31,22 +54,24 @@ const DAILY_TODO_TEMPLATE = {
     targetUser: "ayaessam487@gmail.com",
     title: "🌸 Daily Checklist",
     items: [
-        { id: "put-medicine-in-bag", text: "Put your medicine in your bag", emoji: "💊", order: 1, active: true },
-        { id: "eat-breakfast", text: "Eat a good breakfast", emoji: "🥐", order: 2, active: true },
-        { id: "take-morning-medicine", text: "Take your morning medicine", emoji: "🌞", order: 3, active: true },
-        { id: "enjoy-coffee", text: "Enjoy your coffee", emoji: "☕", order: 4, active: true },
-        { id: "have-lunch", text: "Have lunch", emoji: "🍱", order: 5, active: true },
-        { id: "finish-work", text: "Finish your work", emoji: "💼", order: 6, active: true },
-        { id: "head-home-safely", text: "Head home safely", emoji: "🏡", order: 7, active: true },
-        { id: "order-food", text: "Order your food", emoji: "🛍️", order: 8, active: true },
-        { id: "get-big-bottle-of-water", text: "Get a big bottle of water", emoji: "🍼", order: 9, active: true },
-        { id: "go-into-room", text: "Go into your room", emoji: "🚪", order: 10, active: true },
-        { id: "lock-door-securely", text: "Lock the door securely", emoji: "🔒", order: 11, active: true },
-        { id: "drink-some-water", text: "Drink some water", emoji: "💧", order: 12, active: true },
-        { id: "eat-meal", text: "Eat your meal", emoji: "🍽️", order: 13, active: true },
-        { id: "take-evening-medicine", text: "Take your evening medicine", emoji: "🌙", order: 14, active: true },
-        { id: "double-check-door-locked", text: "Double-check the door is locked", emoji: "🔐", order: 15, active: true },
-        { id: "rest-and-sleep", text: "Get some rest and go to sleep", emoji: "😴", order: 16, active: true }
+        { id: "put-medicine-in-bag", text: "Put your medicine in your bag", emoji: "💊", category: "daily", points: 10, order: 1, active: true, encouragement: "Bag ready, smart girl. You remembered the important stuff 💕" },
+        { id: "eat-breakfast", text: "Eat a good breakfast", emoji: "🥐", category: "daily", points: 10, order: 2, active: true, encouragement: "Breakfast first, pretty girl. I love seeing you take care of yourself 🌸" },
+        { id: "take-morning-medicine", text: "Take your morning medicine", emoji: "🌞", category: "daily", points: 10, order: 3, active: true, encouragement: "Morning medicine done. Good job habibti, keep going 💕" },
+        { id: "enjoy-coffee", text: "Enjoy your coffee", emoji: "☕", category: "daily", points: 10, order: 4, active: true, encouragement: "Coffee time suits you so much, baby. Enjoy every sip ☕💕" },
+        { id: "have-lunch", text: "Have lunch", emoji: "🍱", category: "daily", points: 10, order: 5, active: true, encouragement: "Lunch checked off. Proud of you for eating properly today 🌸" },
+        { id: "finish-work", text: "Finish your work", emoji: "💼", category: "daily", points: 10, order: 6, active: true, encouragement: "Work done, superstar. You did amazing today 💼💕" },
+        { id: "head-home-safely", text: "Head home safely", emoji: "🏡", category: "daily", points: 10, order: 7, active: true, encouragement: "Heading home safely makes my heart calm. Good girl 💕" },
+        { id: "order-food", text: "Order your food", emoji: "🛍️", category: "daily", points: 10, order: 8, active: true, encouragement: "Food ordered. Love that you took care of dinner, baby 🌸" },
+        { id: "self-care-check", text: "Have one calm self-care moment this week", emoji: "🌷", category: "weekly", points: 25, order: 9, active: true, encouragement: "That self-care moment matters. You deserve softness and peace 🌷💕" },
+        { id: "water-bottle-refill", text: "Refill your water bottle for tomorrow", emoji: "🍼", category: "daily", points: 10, order: 10, active: true, encouragement: "Bottle refilled. Future-you is going to love you for that 💧💕" },
+        { id: "go-into-room", text: "Go into your room", emoji: "🚪", category: "daily", points: 10, order: 11, active: true, encouragement: "Room time. Cozy mode activated for my favorite girl 🚪💕" },
+        { id: "lock-door-securely", text: "Lock the door securely", emoji: "🔒", category: "daily", points: 10, order: 12, active: true, encouragement: "Door locked. Thank you for keeping yourself safe, habibti 🔒" },
+        { id: "drink-some-water", text: "Drink some water", emoji: "💧", category: "daily", points: 10, order: 13, active: true, encouragement: "Water check. Good job baby, keep taking care of yourself 💧💕" },
+        { id: "eat-meal", text: "Eat your meal", emoji: "🍽️", category: "daily", points: 10, order: 14, active: true, encouragement: "Meal finished. Proud of you, pretty girl 🍽️💕" },
+        { id: "take-evening-medicine", text: "Take your evening medicine", emoji: "🌙", category: "daily", points: 10, order: 15, active: true, encouragement: "Evening medicine done. Perfect, baby 🌙💕" },
+        { id: "double-check-door-locked", text: "Double-check the door is locked", emoji: "🔐", category: "daily", points: 10, order: 16, active: true, encouragement: "Double-check done. Safe and secure, just how I want you 🔐💕" },
+        { id: "rest-and-sleep", text: "Get some rest and go to sleep", emoji: "😴", category: "daily", points: 10, order: 17, active: true, encouragement: "Sleep time, my love. Rest well and dream pretty 😴🌸" },
+        { id: "send-a-cute-update", text: "Send a cute little update for extra love points", emoji: "💌", category: "extra", points: 15, order: 18, active: true, encouragement: "That cute update made my whole day better 💌💕" }
     ]
 };
 
@@ -58,21 +83,17 @@ const APP_VIEW_STORAGE_KEY = "private-chat-app-view-v1";
 const THEMES = {
     "midnight-cute": {
         emoji: "💕",
-        label: "Midnight Cute",
-        nextLabel: "Cute"
+        label: "Midnight Cute"
     },
     cute: {
-        emoji: "💕",
-        label: "Cute",
-        nextLabel: "Classic"
+        emoji: "🌷",
+        label: "Cute"
     },
     classic: {
         emoji: "🖤",
-        label: "Classic",
-        nextLabel: "Midnight Cute"
+        label: "Classic"
     }
 };
-const THEME_ORDER = ["midnight-cute", "cute", "classic"];
 const DAILY_TODO_ENCOURAGEMENT_MESSAGE = "Good job baby 💕 Im so proud of you, keep going youre doing amazing 💕";
 const DAILY_TODO_REWARD_LABELS = {
     low: "Sweet reset tomorrow 💕",
@@ -115,7 +136,15 @@ const state = {
     todoTemplate: DAILY_TODO_TEMPLATE,
     todoToday: null,
     todoDayWatcher: null,
-    todoSyncMode: "unknown"
+    todoSyncMode: "unknown",
+    todoTemplateSyncMode: "unknown",
+    totalLoveScore: 0,
+    loveStreak: 0,
+    reactionSupport: "unknown",
+    activeReactionPickerMessageId: null,
+    activeTodoCategory: "daily",
+    headerToolsOpen: false,
+    todoReminderWatcher: null
 };
 
 // ============================================================================
@@ -210,6 +239,34 @@ function isArabic(text) {
 function autoResizeTextarea(textarea) {
     textarea.style.height = "auto";
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + "px";
+    updateComposerScrollbar(textarea);
+}
+
+function updateComposerScrollbar(textarea = document.getElementById("msg")) {
+    const target = textarea || document.getElementById("msg");
+    const rail = document.getElementById("composer-scrollbar");
+    const thumb = document.getElementById("composer-scrollbar-thumb");
+    if (!target || !rail || !thumb) return;
+
+    const hasOverflow = target.scrollHeight - target.clientHeight > 2;
+    const hasText = Boolean(target.value?.trim());
+
+    if (!hasOverflow || !hasText) {
+        rail.classList.add("hidden");
+        thumb.style.height = "";
+        thumb.style.transform = "";
+        return;
+    }
+
+    const railHeight = rail.clientHeight;
+    const thumbHeight = Math.max(24, Math.round((target.clientHeight / target.scrollHeight) * railHeight));
+    const maxScrollTop = Math.max(1, target.scrollHeight - target.clientHeight);
+    const maxThumbOffset = Math.max(0, railHeight - thumbHeight);
+    const thumbOffset = (target.scrollTop / maxScrollTop) * maxThumbOffset;
+
+    rail.classList.remove("hidden");
+    thumb.style.height = `${thumbHeight}px`;
+    thumb.style.transform = `translateY(${thumbOffset}px)`;
 }
 
 function escapeHtml(str) {
@@ -236,6 +293,15 @@ function isNobody() {
     return state.currentUserEmail === DAILY_TODO_TEMPLATE.owner;
 }
 
+function slugifyTodoText(text) {
+    return (text || "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 40) || `todo-${Date.now()}`;
+}
+
 function getTodayDateKey() {
     const now = new Date();
     const year = now.getFullYear();
@@ -244,32 +310,93 @@ function getTodayDateKey() {
     return `${year}-${month}-${day}`;
 }
 
-function createTodoRecord(dateKey = getTodayDateKey()) {
-    const items = state.todoTemplate.items
+function getWeekKey(dateKey = getTodayDateKey()) {
+    const base = new Date(`${dateKey}T12:00:00`);
+    const weekday = (base.getDay() + 6) % 7;
+    base.setDate(base.getDate() - weekday);
+    const year = base.getFullYear();
+    const month = String(base.getMonth() + 1).padStart(2, "0");
+    const day = String(base.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function getTodoCategory(item) {
+    return TODO_CATEGORY_CONFIG[item?.category] ? item.category : "daily";
+}
+
+function getTodoItemPoints(item) {
+    const category = getTodoCategory(item);
+    const parsed = Number(item?.points);
+    return Number.isFinite(parsed) && parsed > 0
+        ? Math.round(parsed)
+        : TODO_CATEGORY_CONFIG[category].defaultPoints;
+}
+
+function getTodoItemEncouragement(item) {
+    return (item?.encouragement || "").trim() || DAILY_TODO_ENCOURAGEMENT_MESSAGE;
+}
+
+function getActiveTodoItems() {
+    return state.todoTemplate.items
         .filter(item => item.active !== false)
-        .sort((a, b) => a.order - b.order)
-        .map(item => ({
+        .sort((a, b) => a.order - b.order);
+}
+
+function normalizeTodoTemplate(template) {
+    const sourceItems = Array.isArray(template?.items) ? template.items : DAILY_TODO_TEMPLATE.items;
+    return {
+        id: template?.id || DAILY_TODO_TEMPLATE.id,
+        owner: template?.owner || DAILY_TODO_TEMPLATE.owner,
+        targetUser: template?.targetUser || DAILY_TODO_TEMPLATE.targetUser,
+        title: template?.title || DAILY_TODO_TEMPLATE.title,
+        items: sourceItems.map((item, index) => {
+            const category = getTodoCategory(item);
+            return {
+                id: item?.id || slugifyTodoText(item?.text || `todo-${index + 1}`),
+                text: item?.text || "Untitled task",
+                emoji: item?.emoji || "💕",
+                category,
+                encouragement: getTodoItemEncouragement(item),
+                points: getTodoItemPoints({ ...item, category }),
+                order: Number.isFinite(Number(item?.order)) ? Number(item.order) : index + 1,
+                active: item?.active !== false
+            };
+        }).sort((a, b) => a.order - b.order)
+    };
+}
+
+function createTodoRecord(dateKey = getTodayDateKey(), carryoverRecord = null) {
+    const weekKey = getWeekKey(dateKey);
+    const carryItems = Array.isArray(carryoverRecord?.items) ? carryoverRecord.items : [];
+    const items = getActiveTodoItems().map(item => {
+        const carry = carryItems.find(source => (source.itemId || source.id) === item.id);
+        const isWeekly = getTodoCategory(item) === "weekly";
+        return {
             itemId: item.id,
-            done: false,
-            completedAt: null
-        }));
+            done: isWeekly ? Boolean(carry?.done) : false,
+            completedAt: isWeekly ? carry?.completedAt || null : null
+        };
+    });
 
     return {
         templateId: state.todoTemplate.id,
         targetUser: state.todoTemplate.targetUser,
         dateKey,
+        weekKey,
         items,
         summarySent: false
     };
 }
 
 function normalizeTodoRecord(record, fallbackDateKey = getTodayDateKey()) {
-    const normalized = createTodoRecord(record?.dateKey || fallbackDateKey);
+    const effectiveDateKey = record?.dateKey || fallbackDateKey;
+    const normalized = createTodoRecord(effectiveDateKey);
     const sourceItems = Array.isArray(record?.items) ? record.items : [];
 
     normalized.templateId = record?.templateId || state.todoTemplate.id;
     normalized.targetUser = record?.targetUser || state.todoTemplate.targetUser;
     normalized.summarySent = Boolean(record?.summarySent);
+    normalized.weekKey = record?.weekKey || getWeekKey(effectiveDateKey);
     normalized.items = normalized.items.map(item => {
         const match = sourceItems.find(source => (source.itemId || source.id) === item.itemId);
         return {
@@ -290,11 +417,30 @@ function isTodoTableUnavailableError(error) {
     return error?.code === "42P01" || /daily_todo_records/i.test(error?.message || "");
 }
 
+function isTodoTemplateTableUnavailableError(error) {
+    return error?.code === "42P01" || /daily_todo_templates/i.test(error?.message || "");
+}
+
+function isReactionColumnUnavailableError(error) {
+    return error?.code === "42703" || /reactions_json/i.test(error?.message || "");
+}
+
 function mapTodoRowToRecord(row) {
     return normalizeTodoRecord({
         templateId: row?.template_id,
         targetUser: row?.target_email,
         dateKey: row?.date_key,
+        weekKey: row?.week_key,
+        items: Array.isArray(row?.items_json) ? row.items_json : []
+    });
+}
+
+function mapTodoTemplateRowToTemplate(row) {
+    return normalizeTodoTemplate({
+        id: row?.id,
+        owner: row?.owner_email,
+        targetUser: row?.target_email,
+        title: row?.title,
         items: Array.isArray(row?.items_json) ? row.items_json : []
     });
 }
@@ -364,17 +510,97 @@ async function syncTodoRecordToChatMessages(record) {
 function createTodoRowPayload(record) {
     const normalized = normalizeTodoRecord(record);
     const metrics = getTodoMetrics(normalized);
+    const totalScore = getCombinedTodoScore(normalized);
 
     return {
         template_id: state.todoTemplate.id,
         target_email: state.todoTemplate.targetUser,
         date_key: normalized.dateKey,
+        week_key: normalized.weekKey || getWeekKey(normalized.dateKey),
         items_json: normalized.items,
         score: metrics.score,
         completed_count: metrics.completedCount,
         total_count: metrics.totalCount,
-        reward_tier: metrics.rewardTier
+        reward_tier: metrics.rewardTier,
+        total_score: totalScore
     };
+}
+
+function createTodoTemplateRowPayload(template = state.todoTemplate) {
+    const normalized = normalizeTodoTemplate(template);
+    return {
+        id: normalized.id,
+        owner_email: normalized.owner,
+        target_email: normalized.targetUser,
+        title: normalized.title,
+        items_json: normalized.items
+    };
+}
+
+async function fetchTodoTemplateFromSupabase() {
+    if (!state.supabaseClient) return normalizeTodoTemplate(state.todoTemplate);
+
+    const { data, error } = await state.supabaseClient
+        .from(DAILY_TODO_TEMPLATE_TABLE)
+        .select("id, owner_email, target_email, title, items_json")
+        .eq("id", DAILY_TODO_TEMPLATE.id)
+        .maybeSingle();
+
+    if (error) {
+        if (isTodoTemplateTableUnavailableError(error)) {
+            state.todoTemplateSyncMode = "local";
+            return normalizeTodoTemplate(DAILY_TODO_TEMPLATE);
+        }
+        throw error;
+    }
+
+    state.todoTemplateSyncMode = "supabase";
+    return data ? mapTodoTemplateRowToTemplate(data) : normalizeTodoTemplate(DAILY_TODO_TEMPLATE);
+}
+
+async function syncTodoTemplateToSupabase(template = state.todoTemplate) {
+    const normalized = normalizeTodoTemplate(template);
+    if (!state.supabaseClient) return normalized;
+
+    const { data, error } = await state.supabaseClient
+        .from(DAILY_TODO_TEMPLATE_TABLE)
+        .upsert(createTodoTemplateRowPayload(normalized), { onConflict: "id" })
+        .select("id, owner_email, target_email, title, items_json")
+        .single();
+
+    if (error) {
+        if (isTodoTemplateTableUnavailableError(error)) {
+            state.todoTemplateSyncMode = "local";
+            throw new Error("The daily_todo_templates table is missing. Run the SQL setup file first.");
+        }
+        throw error;
+    }
+
+    state.todoTemplateSyncMode = "supabase";
+    return mapTodoTemplateRowToTemplate(data);
+}
+
+async function fetchCarryoverWeeklyRecord(dateKey = getTodayDateKey()) {
+    if (!state.supabaseClient || state.todoSyncMode === "local" || state.todoSyncMode === "chat") return null;
+
+    const weekKey = getWeekKey(dateKey);
+    const { data, error } = await state.supabaseClient
+        .from(DAILY_TODO_TABLE)
+        .select("template_id, target_email, date_key, week_key, items_json")
+        .eq("template_id", state.todoTemplate.id)
+        .eq("target_email", state.todoTemplate.targetUser)
+        .eq("week_key", weekKey)
+        .lt("date_key", dateKey)
+        .order("date_key", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (error) {
+        if (isTodoTableUnavailableError(error)) return null;
+        throw error;
+    }
+
+    return data ? mapTodoRowToRecord(data) : null;
 }
 
 async function fetchTodoRecordFromSupabase(dateKey = getTodayDateKey()) {
@@ -383,7 +609,7 @@ async function fetchTodoRecordFromSupabase(dateKey = getTodayDateKey()) {
 
     const { data, error } = await state.supabaseClient
         .from(DAILY_TODO_TABLE)
-        .select("template_id, target_email, date_key, items_json")
+        .select("template_id, target_email, date_key, week_key, items_json")
         .eq("template_id", state.todoTemplate.id)
         .eq("target_email", state.todoTemplate.targetUser)
         .eq("date_key", dateKey)
@@ -418,7 +644,7 @@ async function syncTodoRecordToSupabase(record) {
     const { data, error } = await state.supabaseClient
         .from(DAILY_TODO_TABLE)
         .upsert(payload, { onConflict: "template_id,target_email,date_key" })
-        .select("template_id, target_email, date_key, items_json")
+        .select("template_id, target_email, date_key, week_key, items_json")
         .single();
 
     if (error) {
@@ -462,38 +688,49 @@ function getStoredAppViewPreference() {
     return localStorage.getItem(APP_VIEW_STORAGE_KEY) === "true";
 }
 
-function updateThemeToggleButton() {
-    const button = document.getElementById("theme-toggle-btn");
+function updateThemeControls() {
+    const select = document.getElementById("theme-select");
     const emoji = document.getElementById("theme-toggle-emoji");
     const label = document.getElementById("theme-toggle-label");
     const themeMeta = THEMES[state.activeTheme] || THEMES.cute;
 
     if (emoji) emoji.textContent = themeMeta.emoji;
-    if (label) label.textContent = themeMeta.label;
+    if (label) label.textContent = "Theme";
+    if (select) select.value = state.activeTheme;
+}
 
+function setHeaderToolsOpen(isOpen) {
+    state.headerToolsOpen = Boolean(isOpen);
+    const menu = document.getElementById("header-tools-menu");
+    const button = document.getElementById("tools-toggle-btn");
+    if (menu) menu.style.display = state.headerToolsOpen ? "flex" : "none";
     if (button) {
-        button.title = `Switch to ${themeMeta.nextLabel} theme`;
-        button.setAttribute("aria-label", `Switch to ${themeMeta.nextLabel} theme`);
+        button.setAttribute("aria-expanded", state.headerToolsOpen ? "true" : "false");
+        button.title = state.headerToolsOpen ? "Close tools" : "More tools";
     }
 }
+
+window.toggleHeaderTools = function (event) {
+    event?.stopPropagation();
+    setHeaderToolsOpen(!state.headerToolsOpen);
+};
 
 function applyTheme(themeName) {
     const theme = THEMES[themeName] ? themeName : "midnight-cute";
     state.activeTheme = theme;
     document.body.dataset.theme = theme;
     localStorage.setItem(THEME_STORAGE_KEY, theme);
-    updateThemeToggleButton();
-}
+    updateThemeControls();
+};
 
-function getNextThemeName(currentTheme) {
-    const currentIndex = THEME_ORDER.indexOf(currentTheme);
-    if (currentIndex === -1) return THEME_ORDER[0];
-    return THEME_ORDER[(currentIndex + 1) % THEME_ORDER.length];
-}
+window.setThemeFromMenu = function (themeName) {
+    applyTheme(themeName);
+    setHeaderToolsOpen(false);
+};
 
-window.toggleTheme = function () {
-    const nextTheme = getNextThemeName(state.activeTheme);
-    applyTheme(nextTheme);
+window.toggleAppViewFromMenu = async function () {
+    await toggleAppView();
+    setHeaderToolsOpen(false);
 };
 
 function updateAppViewButton() {
@@ -577,10 +814,19 @@ window.toggleAppView = async function () {
     await requestBrowserFullscreen();
 };
 
-function getTodoMetrics(record = state.todoToday) {
-    const totalCount = state.todoTemplate.items.filter(item => item.active !== false).length;
-    const completedCount = (record?.items || []).filter(item => item.done).length;
-    const score = completedCount * 10 + (completedCount === totalCount && totalCount > 0 ? 20 : 0);
+function getTodoMetrics(record = state.todoToday, category = null) {
+    const activeItems = category
+        ? getActiveTodoItems().filter(item => getTodoCategory(item) === category)
+        : getActiveTodoItems();
+    const totalCount = activeItems.length;
+    const completedEntries = (record?.items || []).filter(item =>
+        item.done && activeItems.some(templateItem => templateItem.id === item.itemId)
+    );
+    const completedCount = completedEntries.length;
+    const score = completedEntries.reduce((sum, entry) => {
+        const templateItem = activeItems.find(item => item.id === entry.itemId);
+        return sum + getTodoItemPoints(templateItem);
+    }, 0) + (completedCount === totalCount && totalCount > 0 ? 20 : 0);
     const percent = totalCount ? Math.round((completedCount / totalCount) * 100) : 0;
 
     let rewardTier = "low";
@@ -596,6 +842,13 @@ function getTodoMetrics(record = state.todoToday) {
         rewardTier,
         rewardLabel: DAILY_TODO_REWARD_LABELS[rewardTier]
     };
+}
+
+function getCombinedTodoScore(record = state.todoToday) {
+    return TODO_CATEGORY_ORDER.reduce((sum, category) => {
+        if (!getTodoItemsByCategory(category).length) return sum;
+        return sum + getTodoMetrics(record, category).score;
+    }, 0);
 }
 
 function getTodoRewardMessage(metrics = getTodoMetrics()) {
@@ -629,8 +882,97 @@ async function sendTodoDaySummary(record) {
     }
 }
 
+function getLastTodoReminderAt() {
+    const raw = localStorage.getItem(TODO_REMINDER_STORAGE_KEY);
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function setLastTodoReminderAt(timestamp) {
+    localStorage.setItem(TODO_REMINDER_STORAGE_KEY, String(timestamp));
+}
+
+async function maybeSendTodoReminder() {
+    if (!state.currentUserEmail || !state.todoToday) return;
+    if (getTodoMetrics(state.todoToday).percent === 100) return;
+
+    const now = Date.now();
+    if (now - getLastTodoReminderAt() < TODO_REMINDER_INTERVAL_MS) return;
+
+    try {
+        const thresholdIso = new Date(now - TODO_REMINDER_INTERVAL_MS).toISOString();
+        const { data, error } = await state.supabaseClient
+            .from("chat_messages")
+            .select("id, created_at")
+            .eq("message_type", "system")
+            .eq("text", TODO_REMINDER_MESSAGE)
+            .gte("created_at", thresholdIso)
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+        if (error) throw error;
+        if ((data || []).length) {
+            setLastTodoReminderAt(now);
+            return;
+        }
+
+        await sendSystemMessage(TODO_REMINDER_MESSAGE);
+        setLastTodoReminderAt(now);
+    } catch (error) {
+        console.error("Todo reminder error:", error);
+    }
+}
+
+async function refreshTodoScoreboard() {
+    if (!state.supabaseClient || state.todoSyncMode === "local" || state.todoSyncMode === "chat") {
+        state.totalLoveScore = getCombinedTodoScore(state.todoToday);
+        state.loveStreak = getTodoMetrics(state.todoToday).completedCount > 0 ? 1 : 0;
+        renderLoveStatsBar();
+        return;
+    }
+
+    try {
+        const { data, error } = await state.supabaseClient
+            .from(DAILY_TODO_TABLE)
+            .select("date_key, score, completed_count")
+            .eq("template_id", state.todoTemplate.id)
+            .eq("target_email", state.todoTemplate.targetUser)
+            .order("date_key", { ascending: false })
+            .limit(365);
+
+        if (error) throw error;
+
+        const rows = data || [];
+        state.totalLoveScore = rows.reduce((sum, row) => sum + (Number(row.score) || 0), 0);
+
+        let streak = 0;
+        let cursor = new Date(`${getTodayDateKey()}T12:00:00`);
+        const rowMap = new Map(rows.map(row => [row.date_key, row]));
+
+        while (true) {
+            const key = cursor.toISOString().slice(0, 10);
+            const row = rowMap.get(key);
+            if (!row || (Number(row.completed_count) || 0) <= 0) break;
+            streak += 1;
+            cursor.setDate(cursor.getDate() - 1);
+        }
+
+        state.loveStreak = streak;
+        renderLoveStatsBar();
+    } catch (error) {
+        console.error("Todo scoreboard error:", error);
+    }
+}
+
 async function ensureCurrentTodoRecord() {
     if (!state.currentUserEmail) return;
+
+    try {
+        state.todoTemplate = await fetchTodoTemplateFromSupabase();
+    } catch (error) {
+        console.error("Todo template sync error:", error);
+        state.todoTemplate = normalizeTodoTemplate(DAILY_TODO_TEMPLATE);
+    }
 
     const todayKey = getTodayDateKey();
     const storedRecord = getStoredTodoRecord();
@@ -643,9 +985,10 @@ async function ensureCurrentTodoRecord() {
         let record = await fetchTodoRecordFromSupabase(todayKey);
 
         if (!record) {
+            const weeklyCarryover = await fetchCarryoverWeeklyRecord(todayKey);
             record = storedRecord?.dateKey === todayKey
                 ? storedRecord
-                : createTodoRecord(todayKey);
+                : createTodoRecord(todayKey, weeklyCarryover);
 
             record = await syncTodoRecordToSupabase(record);
         }
@@ -661,17 +1004,26 @@ async function ensureCurrentTodoRecord() {
 
         saveTodoRecord(record);
     }
+
+    await refreshTodoScoreboard();
 }
 
 async function initializeDailyTodo() {
     await ensureCurrentTodoRecord();
     renderTodoModal();
+    renderLoveStatsBar();
 
     if (state.todoDayWatcher) clearInterval(state.todoDayWatcher);
     state.todoDayWatcher = setInterval(async () => {
         await ensureCurrentTodoRecord();
         renderTodoModal();
     }, 60000);
+
+    if (state.todoReminderWatcher) clearInterval(state.todoReminderWatcher);
+    state.todoReminderWatcher = setInterval(() => {
+        maybeSendTodoReminder();
+    }, 60000);
+    maybeSendTodoReminder();
 
     if (isMyLove()) openTodoModal();
 }
@@ -971,6 +1323,10 @@ async function setupRealtimeSubscription() {
         if (p.new.sender !== state.currentUserEmail) handleNewMessage(p.new);
     });
 
+    state.channel.on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages" }, (p) => {
+        applyMessageUpdate(p.new);
+    });
+
     if (state.todoSyncMode === "supabase") {
         state.channel.on("postgres_changes", { event: "*", schema: "public", table: DAILY_TODO_TABLE }, (p) => {
             const row = p.new || p.old;
@@ -980,6 +1336,22 @@ async function setupRealtimeSubscription() {
             if (row.date_key !== getTodayDateKey()) return;
 
             saveTodoRecord(mapTodoRowToRecord(row));
+            refreshTodoScoreboard();
+            renderTodoModal();
+        });
+    }
+
+    if (state.todoTemplateSyncMode === "supabase") {
+        state.channel.on("postgres_changes", { event: "*", schema: "public", table: DAILY_TODO_TEMPLATE_TABLE }, (p) => {
+            const row = p.new || p.old;
+            if (!row) return;
+            if (row.id !== state.todoTemplate.id) return;
+
+            state.todoTemplate = mapTodoTemplateRowToTemplate(row);
+            if (state.todoToday) {
+                state.todoToday = normalizeTodoRecord(state.todoToday);
+                saveTodoRecord(state.todoToday);
+            }
             renderTodoModal();
         });
     }
@@ -1011,6 +1383,11 @@ window.toggleSearch = function () {
     const input = document.getElementById("search-input");
     if (bar.style.display === "none") { bar.style.display = "flex"; input.focus(); }
     else closeSearch();
+};
+
+window.toggleSearchFromMenu = function () {
+    toggleSearch();
+    setHeaderToolsOpen(false);
 };
 
 window.closeSearch = function () {
@@ -1091,6 +1468,52 @@ window.cancelReply = function () {
 // PART 2 — SEND TEXT MESSAGE
 // ============================================================================
 
+async function insertChatMessage(messageData) {
+    const { data, error } = await state.supabaseClient
+        .from("chat_messages")
+        .insert([messageData])
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+async function sendSystemMessage(text, metadata = {}) {
+    const systemMessage = await insertChatMessage({
+        sender: state.todoTemplate.owner,
+        text,
+        message_type: "system",
+        read: true
+    });
+
+    if (!state.allMessages.some(message => message.id === systemMessage.id)) {
+        state.allMessages.push(systemMessage);
+        renderMessage(systemMessage, false);
+        scrollToBottom(true);
+    }
+
+    if (state.channel) {
+        await state.channel.send({ type: "broadcast", event: "new-message", payload: systemMessage });
+    }
+
+    return systemMessage;
+}
+
+function getReplyPayload() {
+    if (!state.replyToMessage) return {};
+
+    return {
+        reply_to_id: state.replyToMessage.id,
+        reply_to_sender: state.replyToMessage.sender,
+        reply_to_text:
+            state.replyToMessage.message_type === "image" ? "📷 Photo" :
+                state.replyToMessage.message_type === "video" ? "🎥 Video" :
+                    state.replyToMessage.message_type === "voice" ? "🎤 Voice message" :
+                        (state.replyToMessage.text || "")
+    };
+}
+
 window.send = async function () {
     const textarea = document.getElementById("msg");
     const text = textarea.value.trim();
@@ -1104,22 +1527,9 @@ window.send = async function () {
             read: false
         };
 
-        if (state.replyToMessage) {
-            msgData.reply_to_id = state.replyToMessage.id;
-            msgData.reply_to_sender = state.replyToMessage.sender;
-            msgData.reply_to_text =
-                state.replyToMessage.message_type === "image" ? "📷 Photo" :
-                    state.replyToMessage.message_type === "video" ? "🎥 Video" :
-                        state.replyToMessage.message_type === "voice" ? "🎤 Voice message" :
-                            state.replyToMessage.text;
-        }
+        Object.assign(msgData, getReplyPayload());
 
-        const { data, error } = await state.supabaseClient
-            .from("chat_messages")
-            .insert([msgData])
-            .select()
-            .single();
-        if (error) throw error;
+        const data = await insertChatMessage(msgData);
 
         if (!state.allMessages.some(m => m.id === data.id)) {
             state.allMessages.push(data);
@@ -1135,6 +1545,8 @@ window.send = async function () {
         textarea.style.height = "40px";
         textarea.style.direction = "ltr";
         textarea.style.textAlign = "left";
+        textarea.scrollTop = 0;
+        updateComposerScrollbar(textarea);
         cancelReply();
         updateSendVoiceToggle("");
 
@@ -1155,10 +1567,216 @@ function getLastRenderedDateLabel() {
     return separators[separators.length - 1].dataset.date;
 }
 
+function isSystemMessage(message) {
+    return (message?.message_type || "text") === "system";
+}
+
+function normalizeMessageReactions(message) {
+    return Array.isArray(message?.reactions_json)
+        ? message.reactions_json
+            .map(entry => ({
+                emoji: entry?.emoji || "",
+                users: Array.isArray(entry?.users) ? entry.users.filter(Boolean) : []
+            }))
+            .filter(entry => entry.emoji && entry.users.length)
+        : [];
+}
+
+function getReactionCount(message) {
+    return normalizeMessageReactions(message).reduce((sum, entry) => sum + entry.users.length, 0);
+}
+
+function closeReactionPickers() {
+    document.querySelectorAll(".reaction-picker").forEach(el => el.remove());
+    state.activeReactionPickerMessageId = null;
+}
+
+function positionReactionPicker(picker, bubble, isSender) {
+    const rect = bubble.getBoundingClientRect();
+    const pickerWidth = picker.offsetWidth || 280;
+    const viewportWidth = window.innerWidth;
+    const margin = 12;
+
+    let left = isSender ? rect.left : rect.right - pickerWidth;
+    left = Math.max(margin, Math.min(left, viewportWidth - pickerWidth - margin));
+
+    const top = Math.max(margin, rect.top - picker.offsetHeight - 8);
+
+    picker.style.position = "fixed";
+    picker.style.left = `${left}px`;
+    picker.style.top = `${top}px`;
+    picker.style.right = "auto";
+}
+
+function addLongPressReaction(bubble, messageId) {
+    let timer = null;
+    let startX = 0;
+    let startY = 0;
+    const shouldIgnore = (target) => !!target?.closest("input, button, textarea, audio, video, a, .voice-waveform, .voice-message, .message-reactions");
+
+    const clearTimer = () => {
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+    };
+
+    bubble.addEventListener("pointerdown", (event) => {
+        if (shouldIgnore(event.target) || event.pointerType === "mouse") return;
+        startX = event.clientX;
+        startY = event.clientY;
+        timer = setTimeout(() => {
+            openReactionPicker(messageId);
+            clearTimer();
+        }, 450);
+    });
+
+    bubble.addEventListener("pointermove", (event) => {
+        if (!timer) return;
+        if (Math.abs(event.clientX - startX) > 10 || Math.abs(event.clientY - startY) > 10) {
+            clearTimer();
+        }
+    });
+
+    ["pointerup", "pointercancel", "pointerleave"].forEach(eventName => {
+        bubble.addEventListener(eventName, clearTimer);
+    });
+}
+
+function renderMessageReactionBar(bubble, message) {
+    let bar = bubble.querySelector(".message-reactions");
+    const reactions = normalizeMessageReactions(message);
+
+    if (!reactions.length) {
+        if (bar) bar.remove();
+        return;
+    }
+
+    if (!bar) {
+        bar = document.createElement("div");
+        bar.className = "message-reactions";
+        bubble.appendChild(bar);
+    }
+
+    bar.innerHTML = "";
+    reactions.forEach(entry => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = `reaction-chip ${entry.users.includes(state.currentUserEmail) ? "mine" : ""}`;
+        chip.textContent = `${entry.emoji} ${entry.users.length}`;
+        chip.title = entry.users.map(user => USER_NAMES[user] || user).join(", ");
+        chip.onclick = (event) => {
+            event.stopPropagation();
+            toggleMessageReaction(message.id, entry.emoji);
+        };
+        bar.appendChild(chip);
+    });
+}
+
+function renderSystemMessageContent(bubble, message) {
+    const textDiv = document.createElement("div");
+    textDiv.className = "system-message-text";
+    textDiv.textContent = message.text || "";
+    bubble.appendChild(textDiv);
+}
+
+window.openReactionPicker = function (messageId, anchor = null) {
+    const bubble = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!bubble || bubble.classList.contains("system")) return;
+
+    if (state.activeReactionPickerMessageId === messageId) {
+        closeReactionPickers();
+        return;
+    }
+
+    closeReactionPickers();
+    state.activeReactionPickerMessageId = messageId;
+
+    const picker = document.createElement("div");
+    picker.className = "reaction-picker";
+    DEFAULT_REACTION_EMOJIS.forEach(emoji => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "reaction-option";
+        button.textContent = emoji;
+        button.onclick = (event) => {
+            event.stopPropagation();
+            closeReactionPickers();
+            toggleMessageReaction(messageId, emoji);
+        };
+        picker.appendChild(button);
+    });
+
+    const isSender = bubble.classList.contains("sender");
+    document.body.appendChild(picker);
+    if (isSender) {
+        picker.classList.add("sender-side");
+    } else {
+        picker.classList.add("receiver-side");
+    }
+    requestAnimationFrame(() => positionReactionPicker(picker, bubble, isSender));
+}
+
+async function toggleMessageReaction(messageId, emoji) {
+    if (!state.supabaseClient) return;
+
+    const message = state.allMessages.find(entry => entry.id === messageId);
+    if (!message) return;
+
+    const reactions = normalizeMessageReactions(message).map(entry => ({
+        emoji: entry.emoji,
+        users: entry.users.slice()
+    }));
+    const existing = reactions.find(entry => entry.emoji === emoji);
+
+    if (existing) {
+        existing.users = existing.users.includes(state.currentUserEmail)
+            ? existing.users.filter(user => user !== state.currentUserEmail)
+            : existing.users.concat(state.currentUserEmail);
+    } else {
+        reactions.push({ emoji, users: [state.currentUserEmail] });
+    }
+
+    const cleaned = reactions.filter(entry => entry.users.length);
+
+    try {
+        const { data, error } = await state.supabaseClient
+            .from("chat_messages")
+            .update({ reactions_json: cleaned })
+            .eq("id", messageId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        state.reactionSupport = "supabase";
+        applyMessageUpdate(data);
+    } catch (error) {
+        console.error("Reaction update error:", error);
+        if (isReactionColumnUnavailableError(error)) {
+            state.reactionSupport = "unsupported";
+            showAlert("Message reactions need the SQL setup file to add the reactions_json column.");
+        }
+    }
+}
+
+function applyMessageUpdate(message) {
+    if (!message?.id) return;
+    const index = state.allMessages.findIndex(entry => entry.id === message.id);
+    if (index === -1) return;
+
+    state.allMessages[index] = { ...state.allMessages[index], ...message };
+    const bubble = document.querySelector(`[data-message-id="${message.id}"]`);
+    if (!bubble) return;
+
+    renderMessageReactionBar(bubble, state.allMessages[index]);
+    if (message.read !== undefined) updateMessageReadReceipt(message.id, message.read);
+}
+
 function renderMessage(message, prepend = false) {
     const messagesDiv = document.getElementById("messages");
     const isSender = message.sender === state.currentUserEmail;
     const messageType = message.message_type || "text";
+    const isSystem = isSystemMessage(message);
 
     // Skip duplicates
     if (document.querySelector(`[data-message-id="${message.id}"]`)) return;
@@ -1180,14 +1798,14 @@ function renderMessage(message, prepend = false) {
 
     // --- Bubble ---
     const bubble = document.createElement("div");
-    bubble.className = `message-bubble ${isSender ? "sender" : "receiver"}`;
+    bubble.className = `message-bubble ${isSystem ? "system" : (isSender ? "sender" : "receiver")}`;
     if (messageType === "image") bubble.classList.add("image-message");
     if (messageType === "video") bubble.classList.add("video-message");
     bubble.dataset.messageId = message.id;
     bubble.dataset.timestamp = message.created_at;
 
     // Sender name (receiver only)
-    if (!isSender) {
+    if (!isSender && !isSystem) {
         const nameDiv = document.createElement("div");
         nameDiv.className = "sender-name";
         nameDiv.textContent = USER_NAMES[message.sender] || "Unknown";
@@ -1195,7 +1813,7 @@ function renderMessage(message, prepend = false) {
     }
 
     // Reply reference block
-    if (message.reply_to_id) {
+    if (message.reply_to_id && !isSystem) {
         const replyBlock = document.createElement("div");
         replyBlock.className = "message-reply";
         const strong = document.createElement("strong");
@@ -1209,7 +1827,9 @@ function renderMessage(message, prepend = false) {
     }
 
     // Message content
-    if (messageType === "image") {
+    if (isSystem) {
+        renderSystemMessageContent(bubble, message);
+    } else if (messageType === "image") {
         renderImageContent(bubble, message, isSender);
     } else if (messageType === "video") {
         renderVideoContent(bubble, message, isSender);
@@ -1227,7 +1847,7 @@ function renderMessage(message, prepend = false) {
     timeSpan.textContent = formatTime(message.created_at);
     metaDiv.appendChild(timeSpan);
 
-    if (isSender) {
+    if (isSender && !isSystem) {
         const receipt = document.createElement("span");
         receipt.className = `receipt ${message.read ? "read" : "sent"}`;
         receipt.textContent = message.read ? "✓✓" : "✓";
@@ -1237,15 +1857,18 @@ function renderMessage(message, prepend = false) {
     bubble.appendChild(metaDiv);
 
     // Reply button (desktop hover)
-    const replyBtn = document.createElement("button");
-    replyBtn.className = "msg-reply-btn";
-    replyBtn.title = "Reply";
-    replyBtn.innerHTML = '<span class="material-icons">reply</span>';
-    replyBtn.onclick = (e) => { e.stopPropagation(); setReply(message.id); };
-    bubble.appendChild(replyBtn);
+    if (!isSystem) {
+        const replyBtn = document.createElement("button");
+        replyBtn.className = "msg-reply-btn";
+        replyBtn.title = "Reply";
+        replyBtn.innerHTML = '<span class="material-icons">reply</span>';
+        replyBtn.onclick = (e) => { e.stopPropagation(); setReply(message.id); };
+        bubble.appendChild(replyBtn);
+        addLongPressReaction(bubble, message.id);
 
-    // Swipe-to-reply (mobile)
-    addSwipeToReply(bubble, message.id);
+        // Swipe-to-reply (mobile)
+        addSwipeToReply(bubble, message.id);
+    }
 
     // Insert into DOM
     if (prepend) {
@@ -1255,6 +1878,8 @@ function renderMessage(message, prepend = false) {
     } else {
         messagesDiv.appendChild(bubble);
     }
+
+    renderMessageReactionBar(bubble, message);
 
     if (!isSender && !message.read) state.unreadMessages.add(message.id);
 }
@@ -1661,17 +2286,135 @@ function formatDuration(totalSeconds) {
     return `${m}:${s}`;
 }
 
+function renderLoveStatsBar() {
+    const streakText = document.getElementById("header-streak-text");
+    if (streakText) streakText.textContent = state.loveStreak > 0 ? `${state.loveStreak}` : "0";
+}
+
+function getTodoItemsByCategory(category) {
+    return getActiveTodoItems().filter(item => getTodoCategory(item) === category);
+}
+
+function getTodoCategoryProgress(category, record = state.todoToday) {
+    const items = getTodoItemsByCategory(category);
+    const entries = Array.isArray(record?.items) ? record.items : [];
+    const completedCount = items.reduce((sum, item) => {
+        const entry = entries.find(progressItem => progressItem.itemId === item.id);
+        return sum + (entry?.done ? 1 : 0);
+    }, 0);
+
+    return {
+        totalCount: items.length,
+        completedCount
+    };
+}
+
+window.setTodoCategory = function (category) {
+    if (!TODO_CATEGORY_CONFIG[category]) return;
+    state.activeTodoCategory = category;
+    renderTodoModal();
+};
+
+function ensureValidActiveTodoCategory() {
+    const visibleCategories = TODO_CATEGORY_ORDER.filter(category => getTodoItemsByCategory(category).length);
+    if (!visibleCategories.length) {
+        state.activeTodoCategory = "daily";
+        return;
+    }
+
+    if (!visibleCategories.includes(state.activeTodoCategory)) {
+        state.activeTodoCategory = visibleCategories[0];
+    }
+}
+
+function renderTodoCategoryNav(container) {
+    if (!container) return;
+    ensureValidActiveTodoCategory();
+    container.innerHTML = "";
+
+    TODO_CATEGORY_ORDER
+        .filter(category => getTodoItemsByCategory(category).length)
+        .forEach(category => {
+            const progress = getTodoCategoryProgress(category);
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = `todo-category-tab ${state.activeTodoCategory === category ? "active" : ""}`;
+            button.innerHTML = `
+                <strong>${escapeHtml(TODO_CATEGORY_CONFIG[category].label)}</strong>
+                <span>${progress.completedCount}/${progress.totalCount} done</span>
+            `;
+            button.onclick = () => setTodoCategory(category);
+            container.appendChild(button);
+        });
+}
+
+function renderTodoTemplateEditor(list) {
+    if (!isNobody()) return;
+
+    const category = state.activeTodoCategory;
+    const items = getTodoItemsByCategory(category);
+    const editor = document.createElement("div");
+    editor.className = "todo-editor";
+    editor.innerHTML = `
+        <div class="todo-editor-header">
+            <strong>Edit ${TODO_CATEGORY_CONFIG[category].label}</strong>
+            <span>Only the currently open category is editable here.</span>
+        </div>
+    `;
+
+    const section = document.createElement("div");
+    section.className = "todo-editor-section";
+
+    const header = document.createElement("div");
+    header.className = "todo-category-header";
+    header.innerHTML = `
+        <div>
+            <strong>${TODO_CATEGORY_CONFIG[category].label}</strong>
+            <p>${TODO_CATEGORY_CONFIG[category].description}</p>
+        </div>
+        <button type="button" class="todo-mini-btn" onclick="addTodoTemplateItem('${category}')">
+            <span class="material-icons">add</span>
+            Add
+        </button>
+    `;
+    section.appendChild(header);
+
+    items.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "todo-editor-item";
+        row.innerHTML = `
+            <div class="todo-editor-row">
+                <input type="text" class="todo-editor-emoji" value="${escapeHtml(item.emoji || "💕")}" maxlength="4"
+                    onchange="updateTodoTemplateItem('${item.id}', 'emoji', this.value)">
+                <input type="text" class="todo-editor-text" value="${escapeHtml(item.text)}"
+                    onchange="updateTodoTemplateItem('${item.id}', 'text', this.value)">
+                <input type="number" class="todo-editor-points" min="1" max="100" value="${getTodoItemPoints(item)}"
+                    onchange="updateTodoTemplateItem('${item.id}', 'points', this.value)">
+                <button type="button" class="todo-mini-btn icon-only" onclick="removeTodoTemplateItem('${item.id}')">
+                    <span class="material-icons">delete</span>
+                </button>
+            </div>
+            <textarea class="todo-editor-note" rows="2"
+                onchange="updateTodoTemplateItem('${item.id}', 'encouragement', this.value)">${escapeHtml(getTodoItemEncouragement(item))}</textarea>
+        `;
+        section.appendChild(row);
+    });
+
+    editor.appendChild(section);
+
+    list.appendChild(editor);
+}
+
 function renderTodoModal() {
     const list = document.getElementById("todo-list");
+    const categoryNav = document.getElementById("todo-category-nav");
     const progressText = document.getElementById("todo-progress-text");
     const scoreText = document.getElementById("todo-score-text");
-    const rewardText = document.getElementById("todo-reward-text");
-    const rewardTitle = document.getElementById("todo-reward-title");
     const subtitle = document.getElementById("todo-subtitle");
     const footerNote = document.getElementById("todo-footer-note");
     const todoBtn = document.getElementById("todo-btn");
 
-    if (!list || !progressText || !scoreText || !rewardText || !rewardTitle || !subtitle || !footerNote || !todoBtn) return;
+    if (!list || !categoryNav || !progressText || !scoreText || !subtitle || !footerNote || !todoBtn) return;
 
     if (!state.currentUserEmail || (!isMyLove() && !isNobody())) {
         todoBtn.style.display = "none";
@@ -1685,29 +2428,42 @@ function renderTodoModal() {
         saveTodoRecord(state.todoToday);
     }
 
-    const metrics = getTodoMetrics();
-    progressText.textContent = `${metrics.completedCount} / ${metrics.totalCount} done today`;
-    scoreText.textContent = `💕 ${metrics.score} points`;
-    rewardTitle.textContent = `Today's reward: ${state.todoTemplate.title}`;
-    rewardText.textContent = `${DAILY_TODO_REWARD_LABELS[metrics.rewardTier]}  ${getTodoRewardMessage(metrics)}`;
+    const metrics = getTodoMetrics(state.todoToday, state.activeTodoCategory);
+    const categoryLabel = TODO_CATEGORY_CONFIG[state.activeTodoCategory]?.label || "Checklist";
+    progressText.textContent = `${metrics.completedCount} / ${metrics.totalCount} ${categoryLabel.toLowerCase()} done`;
+    scoreText.textContent = `💕 ${metrics.score} ${categoryLabel.toLowerCase()} points`;
+    renderLoveStatsBar();
 
     if (isMyLove()) {
-        subtitle.textContent = "Check things off one by one, baby. I'm cheering for you 💕";
+        subtitle.textContent = `💖 Total Love Score: ${state.totalLoveScore}`;
         footerNote.textContent = DAILY_TODO_ENCOURAGEMENT_MESSAGE;
     } else if (isNobody()) {
-        subtitle.innerHTML = '<span class="todo-lock-note"><span class="material-icons">lock</span>Nobody view: list is editable only in code, My Love can only check tasks.</span>';
-        footerNote.textContent = `Today My Love has finished ${metrics.completedCount} of ${metrics.totalCount} tasks.`;
+        subtitle.textContent = `💖 Total Love Score: ${state.totalLoveScore}`;
+        footerNote.textContent = `Today My Love has finished ${metrics.completedCount} of ${metrics.totalCount} tasks and collected ${metrics.score} points.`;
     } else {
-        subtitle.textContent = "This checklist is only for My Love's daily routine.";
+        subtitle.textContent = `💖 Total Love Score: ${state.totalLoveScore}`;
         footerNote.textContent = "Read-only view.";
     }
 
     list.innerHTML = "";
+    renderTodoCategoryNav(categoryNav);
 
-    state.todoTemplate.items
-        .filter(item => item.active !== false)
-        .sort((a, b) => a.order - b.order)
-        .forEach(item => {
+    const activeItems = getTodoItemsByCategory(state.activeTodoCategory);
+    if (activeItems.length) {
+        const section = document.createElement("div");
+        section.className = "todo-category-section";
+
+        const sectionHeader = document.createElement("div");
+        sectionHeader.className = "todo-category-header";
+        sectionHeader.innerHTML = `
+            <div>
+                <strong>${TODO_CATEGORY_CONFIG[state.activeTodoCategory].label}</strong>
+                <p>${TODO_CATEGORY_CONFIG[state.activeTodoCategory].description}</p>
+            </div>
+        `;
+        section.appendChild(sectionHeader);
+
+        activeItems.forEach(item => {
             const progress = state.todoToday.items.find(entry => entry.itemId === item.id) || { done: false, completedAt: null };
             const canToggle = isMyLove();
 
@@ -1721,12 +2477,87 @@ function renderTodoModal() {
                 </label>
                 <div class="todo-item-content">
                     <strong>${escapeHtml(item.emoji || "💕")} ${escapeHtml(item.text)}</strong>
-                    <p>${progress.done ? `Done at ${formatTime(progress.completedAt)}` : (canToggle ? "Tap when it's done 💕" : "My Love can check this item from her account.")}</p>
+                    <p>${progress.done ? `Done at ${formatTime(progress.completedAt)} · +${getTodoItemPoints(item)} pts` : (canToggle ? `Tap when it's done · worth ${getTodoItemPoints(item)} pts` : "My Love can check this item from her account.")}</p>
                 </div>
             `;
 
-            list.appendChild(row);
+            section.appendChild(row);
         });
+
+        list.appendChild(section);
+    }
+
+    renderTodoTemplateEditor(list);
+}
+
+async function persistTodoTemplateUpdate(nextTemplate) {
+    state.todoTemplate = normalizeTodoTemplate(nextTemplate);
+    if (state.todoToday) {
+        state.todoToday = normalizeTodoRecord(state.todoToday);
+        saveTodoRecord(state.todoToday);
+    }
+    renderTodoModal();
+
+    try {
+        state.todoTemplate = await syncTodoTemplateToSupabase(state.todoTemplate);
+        if (state.todoToday) {
+            state.todoToday = normalizeTodoRecord(state.todoToday);
+            saveTodoRecord(state.todoToday);
+        }
+        renderTodoModal();
+    } catch (error) {
+        console.error("Todo template update error:", error);
+        showAlert(error.message || "Failed to save checklist template.");
+    }
+}
+
+window.addTodoTemplateItem = async function (category) {
+    if (!isNobody()) return;
+
+    const items = state.todoTemplate.items.slice();
+    const nextOrder = items.length ? Math.max(...items.map(item => Number(item.order) || 0)) + 1 : 1;
+    items.push({
+        id: `${category}-${Date.now()}`,
+        text: "New lovely task",
+        emoji: "💕",
+        category,
+        encouragement: "Good job baby 💕 Im so proud of you, keep going youre doing amazing 💕",
+        points: TODO_CATEGORY_CONFIG[category]?.defaultPoints || 10,
+        order: nextOrder,
+        active: true
+    });
+
+    await persistTodoTemplateUpdate({ ...state.todoTemplate, items });
+};
+
+window.updateTodoTemplateItem = async function (itemId, field, value) {
+    if (!isNobody()) return;
+
+    const items = state.todoTemplate.items.map(item => {
+        if (item.id !== itemId) return item;
+        if (field === "points") return { ...item, points: Math.max(1, Number(value) || getTodoItemPoints(item)) };
+        return { ...item, [field]: value };
+    });
+
+    await persistTodoTemplateUpdate({ ...state.todoTemplate, items });
+};
+
+window.removeTodoTemplateItem = async function (itemId) {
+    if (!isNobody()) return;
+
+    const items = state.todoTemplate.items.filter(item => item.id !== itemId);
+    await persistTodoTemplateUpdate({ ...state.todoTemplate, items });
+};
+
+async function announceTodoEncouragement(templateItem, metrics) {
+    const categoryLabel = TODO_CATEGORY_CONFIG[getTodoCategory(templateItem)].label;
+    const text = `💕 ${templateItem?.emoji || "💕"} ${templateItem?.text || "A task"} finished\n${getTodoItemEncouragement(templateItem)}\n+${getTodoItemPoints(templateItem)} pts · ${categoryLabel}\nStreak: ${Math.max(state.loveStreak, 1)} day${Math.max(state.loveStreak, 1) === 1 ? "" : "s"} · Total: ${state.totalLoveScore}`;
+
+    try {
+        await sendSystemMessage(text);
+    } catch (error) {
+        console.error("System encouragement message error:", error);
+    }
 }
 
 function scrollToBottom(smooth = false) {
@@ -1757,11 +2588,32 @@ function updateSendVoiceToggle(text) {
 // ============================================================================
 
 window.openAttachmentMenu = function () {
-    document.getElementById("attachment-menu").style.display = "flex";
+    const menu = document.getElementById("attachment-menu");
+    const icon = document.getElementById("attach-btn-icon");
+    const button = document.getElementById("attach-btn");
+    if (menu) menu.style.display = "flex";
+    if (icon) icon.textContent = "close";
+    if (button) button.title = "Close attachments";
 };
 
 window.closeAttachmentMenu = function () {
-    document.getElementById("attachment-menu").style.display = "none";
+    const menu = document.getElementById("attachment-menu");
+    const icon = document.getElementById("attach-btn-icon");
+    const button = document.getElementById("attach-btn");
+    if (menu) menu.style.display = "none";
+    if (icon) icon.textContent = "add";
+    if (button) button.title = "Attach";
+};
+
+window.toggleAttachmentMenu = function (event) {
+    event?.stopPropagation();
+    const menu = document.getElementById("attachment-menu");
+    if (!menu) return;
+    if (menu.style.display === "flex") {
+        closeAttachmentMenu();
+        return;
+    }
+    openAttachmentMenu();
 };
 
 window.openTodoModal = async function () {
@@ -1800,12 +2652,15 @@ window.toggleTodoItem = async function (itemId) {
     try {
         const syncedRecord = await syncTodoRecordToSupabase(state.todoToday);
         saveTodoRecord(syncedRecord);
+        await refreshTodoScoreboard();
         renderTodoModal();
     } catch (error) {
         console.error("Todo update sync error:", error);
     }
 
     if (!wasDone && entry.done) {
+        await refreshTodoScoreboard();
+        await announceTodoEncouragement(templateItem, getTodoMetrics(state.todoToday));
         sendTelegramNotification(`💕 My Love finished: ${templateItem?.text || itemId}\n${DAILY_TODO_ENCOURAGEMENT_MESSAGE}`);
     }
 };
@@ -1886,6 +2741,7 @@ window.confirmImageSend = async function () {
 
     const viewOnce = document.getElementById("view-once-checkbox").checked;
     const toSend = [...state.selectedImages];
+    const replyPayload = getReplyPayload();
 
     document.getElementById("image-preview-modal").style.display = "none";
     document.getElementById("view-once-checkbox").checked = false;
@@ -1914,7 +2770,8 @@ window.confirmImageSend = async function () {
                     image_url: filePath,
                     view_once: viewOnce,
                     viewed_by: [],
-                    read: false
+                    read: false,
+                    ...replyPayload
                 }])
                 .select()
                 .single();
@@ -1930,6 +2787,7 @@ window.confirmImageSend = async function () {
 
             myLoveNotify(`sent ${viewOnce ? "a view-once photo 🔒" : "a photo 📷"}`);
         }
+        cancelReply();
         updateConnectionStatus("connected");
     } catch (err) {
         console.error("confirmImageSend:", err);
@@ -2019,6 +2877,7 @@ window.confirmVideoSend = async function () {
     if (!state.selectedVideo) return;
     const file = state.selectedVideo;
     const viewOnce = document.getElementById("video-view-once-checkbox").checked;
+    const replyPayload = getReplyPayload();
     state.selectedVideo = null;
 
     document.getElementById("video-preview-modal").style.display = "none";
@@ -2044,7 +2903,8 @@ window.confirmVideoSend = async function () {
                 video_url: filePath,
                 view_once: viewOnce,
                 viewed_by: [],
-                read: false
+                read: false,
+                ...replyPayload
             }])
             .select()
             .single();
@@ -2060,6 +2920,7 @@ window.confirmVideoSend = async function () {
 
         myLoveNotify(`sent ${viewOnce ? "a view-once video 🔒" : "a video 🎥"}`);
 
+        cancelReply();
         updateConnectionStatus("connected");
     } catch (err) {
         console.error("confirmVideoSend:", err);
@@ -2326,6 +3187,7 @@ window.sendVoiceRecording = async function () {
     const blob = state.voiceBlob;
     const durationSeconds = state.voicePreviewDurationSeconds || state.voicePreviewAudio?.duration || 0;
     const durationLabel = formatDuration(durationSeconds);
+    const replyPayload = getReplyPayload();
 
     if (!blob) return;
 
@@ -2348,7 +3210,8 @@ window.sendVoiceRecording = async function () {
                 message_type: "voice",
                 voice_url: filePath,
                 voice_duration: durationLabel,
-                read: false
+                read: false,
+                ...replyPayload
             }])
             .select()
             .single();
@@ -2366,6 +3229,7 @@ window.sendVoiceRecording = async function () {
 
         clearVoicePreviewAudio();
         resetVoiceComposerUI();
+        cancelReply();
         state.voiceBlob = null;
         state.voiceRecorder = null;
         state.voiceRecordingStartTime = null;
@@ -2517,11 +3381,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 ta.style.textAlign = "left";
             }
         });
+
+        msgTextarea.addEventListener("scroll", () => {
+            updateComposerScrollbar(msgTextarea);
+        });
+
+        updateComposerScrollbar(msgTextarea);
     }
 
     // Escape closes any open overlay
     document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape") return;
+        setHeaderToolsOpen(false);
 
         const checks = [
             { id: "image-viewer-modal", fn: closeImageViewer },
@@ -2571,10 +3442,23 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("focusout", () => {
         setTimeout(syncViewportLayout, 120);
     });
+
+    document.addEventListener("click", (event) => {
+        if (!event.target.closest(".header-tools")) {
+            setHeaderToolsOpen(false);
+        }
+        if (!event.target.closest(".attachment-dock")) {
+            closeAttachmentMenu();
+        }
+        if (!event.target.closest(".reaction-picker, .reaction-chip")) {
+            closeReactionPickers();
+        }
+    });
 });
 
 window.addEventListener("beforeunload", async () => {
     if (state.currentUserEmail) await updatePresence(false);
     if (state.channel) state.channel.unsubscribe();
     if (state.todoDayWatcher) clearInterval(state.todoDayWatcher);
+    if (state.todoReminderWatcher) clearInterval(state.todoReminderWatcher);
 });
