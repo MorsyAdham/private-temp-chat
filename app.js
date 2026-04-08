@@ -1660,16 +1660,21 @@ function renderMessageReactionBar(bubble, message) {
 
     bar.innerHTML = "";
     reactions.forEach(entry => {
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = `reaction-chip ${entry.users.includes(state.currentUserEmail) ? "mine" : ""}`;
-        chip.textContent = `${entry.emoji} ${entry.users.length}`;
-        chip.title = entry.users.map(user => USER_NAMES[user] || user).join(", ");
-        chip.onclick = (event) => {
-            event.stopPropagation();
-            toggleMessageReaction(message.id, entry.emoji);
-        };
-        bar.appendChild(chip);
+        entry.users.forEach(user => {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = `reaction-chip ${user === state.currentUserEmail ? "mine" : ""}`;
+            chip.textContent = entry.emoji;
+            chip.title = `${USER_NAMES[user] || user} reacted with ${entry.emoji}`;
+            chip.setAttribute("aria-label", chip.title);
+            chip.onclick = (event) => {
+                event.stopPropagation();
+                if (user === state.currentUserEmail) {
+                    toggleMessageReaction(message.id, entry.emoji);
+                }
+            };
+            bar.appendChild(chip);
+        });
     });
 }
 
@@ -2286,9 +2291,19 @@ function formatDuration(totalSeconds) {
     return `${m}:${s}`;
 }
 
+function getProgressLevel(value, thresholds = { low: 1, medium: 3, high: 7, peak: 14 }) {
+    if (value >= thresholds.peak) return "peak";
+    if (value >= thresholds.high) return "high";
+    if (value >= thresholds.medium) return "medium";
+    if (value >= thresholds.low) return "low";
+    return "zero";
+}
+
 function renderLoveStatsBar() {
+    const streakCard = document.getElementById("header-streak-card");
     const streakText = document.getElementById("header-streak-text");
     if (streakText) streakText.textContent = state.loveStreak > 0 ? `${state.loveStreak}` : "0";
+    if (streakCard) streakCard.dataset.level = getProgressLevel(state.loveStreak, { low: 1, medium: 3, high: 7, peak: 14 });
 }
 
 function getTodoItemsByCategory(category) {
@@ -2432,6 +2447,7 @@ function renderTodoModal() {
     const categoryLabel = TODO_CATEGORY_CONFIG[state.activeTodoCategory]?.label || "Checklist";
     progressText.textContent = `${metrics.completedCount} / ${metrics.totalCount} ${categoryLabel.toLowerCase()} done`;
     scoreText.textContent = `💕 ${metrics.score} ${categoryLabel.toLowerCase()} points`;
+    scoreText.dataset.level = getProgressLevel(metrics.percent, { low: 1, medium: 40, high: 75, peak: 100 });
     renderLoveStatsBar();
 
     if (isMyLove()) {

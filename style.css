@@ -544,6 +544,62 @@ input:focus {
   color: var(--primary);
 }
 
+#header-streak-icon {
+  transform-origin: 50% 92%;
+  animation: flame-flicker 1.35s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(255, 150, 102, 0.18));
+}
+
+#header-streak-card[data-level="zero"] #header-streak-icon,
+#header-streak-card[data-level="zero"] #header-streak-text {
+  color: #8c8190;
+}
+
+#header-streak-card[data-level="low"] #header-streak-icon,
+#header-streak-card[data-level="low"] #header-streak-text {
+  color: #f0a45f;
+}
+
+#header-streak-card[data-level="medium"] #header-streak-icon,
+#header-streak-card[data-level="medium"] #header-streak-text {
+  color: #ff8a6b;
+}
+
+#header-streak-card[data-level="high"] #header-streak-icon,
+#header-streak-card[data-level="high"] #header-streak-text {
+  color: #ff5f87;
+}
+
+#header-streak-card[data-level="peak"] #header-streak-icon,
+#header-streak-card[data-level="peak"] #header-streak-text {
+  color: #ff4fba;
+}
+
+#header-streak-card[data-level="peak"] #header-streak-icon {
+  filter:
+    drop-shadow(0 0 7px rgba(255, 115, 176, 0.28))
+    drop-shadow(0 0 14px rgba(255, 182, 77, 0.18));
+}
+
+@keyframes flame-flicker {
+  0%,
+  100% {
+    transform: translateY(0) scale(1) rotate(-2deg);
+  }
+
+  25% {
+    transform: translateY(-1px) scale(1.08, 0.96) rotate(2deg);
+  }
+
+  50% {
+    transform: translateY(-2px) scale(0.95, 1.12) rotate(-1deg);
+  }
+
+  75% {
+    transform: translateY(-1px) scale(1.06, 0.98) rotate(1deg);
+  }
+}
+
 .header-mini-stat.accent {
   padding-left: 11px;
   padding-right: 11px;
@@ -1200,11 +1256,16 @@ body.app-view-enabled .jump-bottom {
 .reaction-chip {
   border: none;
   border-radius: 999px;
-  padding: 3px 8px;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
   background: rgba(255, 255, 255, 0.1);
   color: inherit;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .reaction-chip.mine {
@@ -2049,6 +2110,27 @@ body[data-theme="cute"] .attachment-rail-option:hover {
   font-size: 12px;
   color: var(--text-secondary);
   margin-bottom: 6px;
+}
+
+#todo-score-text[data-level="zero"] {
+  color: var(--text-secondary);
+}
+
+#todo-score-text[data-level="low"] {
+  color: #f0a45f;
+}
+
+#todo-score-text[data-level="medium"] {
+  color: #ff8a6b;
+}
+
+#todo-score-text[data-level="high"] {
+  color: #ff5f87;
+}
+
+#todo-score-text[data-level="peak"] {
+  color: #ff4fba;
+  text-shadow: 0 0 12px rgba(255, 107, 168, 0.16);
 }
 
 .todo-list {
