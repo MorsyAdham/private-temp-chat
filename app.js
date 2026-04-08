@@ -916,7 +916,10 @@ async function maybeSendTodoReminder() {
             return;
         }
 
-        await sendSystemMessage(TODO_REMINDER_MESSAGE);
+        await sendSystemMessage(TODO_REMINDER_MESSAGE, {
+            notifyTelegram: true,
+            telegramText: `💕 Checklist reminder for My Love\n${TODO_REMINDER_MESSAGE}`
+        });
         setLastTodoReminderAt(now);
     } catch (error) {
         console.error("Todo reminder error:", error);
@@ -1497,6 +1500,15 @@ async function sendSystemMessage(text, metadata = {}) {
         await state.channel.send({ type: "broadcast", event: "new-message", payload: systemMessage });
     }
 
+    const telegramText = metadata.telegramText || (metadata.notifyTelegram ? text : "");
+    if (telegramText) {
+        try {
+            await sendTelegramNotification(telegramText);
+        } catch (error) {
+            console.error("System message Telegram notification error:", error);
+        }
+    }
+
     return systemMessage;
 }
 
@@ -1685,6 +1697,20 @@ function renderSystemMessageContent(bubble, message) {
     bubble.appendChild(textDiv);
 }
 
+function getReactionMessagePreview(message) {
+    if (!message) return "a message";
+
+    if (message.message_type === "image") return "a photo";
+    if (message.message_type === "video") return "a video";
+    if (message.message_type === "voice") return "a voice message";
+    if (message.message_type === "system") return "a system update";
+
+    const text = (message.text || "").replace(/\s+/g, " ").trim();
+    if (!text) return "a message";
+    if (text.length <= 60) return `"${text}"`;
+    return `"${text.slice(0, 57)}..."`;
+}
+
 window.openReactionPicker = function (messageId, anchor = null) {
     const bubble = document.querySelector(`[data-message-id="${messageId}"]`);
     if (!bubble || bubble.classList.contains("system")) return;
@@ -1733,6 +1759,7 @@ async function toggleMessageReaction(messageId, emoji) {
         users: entry.users.slice()
     }));
     const existing = reactions.find(entry => entry.emoji === emoji);
+    const hadUserReaction = !!existing?.users.includes(state.currentUserEmail);
 
     if (existing) {
         existing.users = existing.users.includes(state.currentUserEmail)
@@ -1755,6 +1782,9 @@ async function toggleMessageReaction(messageId, emoji) {
         if (error) throw error;
         state.reactionSupport = "supabase";
         applyMessageUpdate(data);
+
+        const actionText = hadUserReaction ? "removed" : "reacted";
+        myLoveNotify(`${actionText} ${emoji} to ${getReactionMessagePreview(message)}`);
     } catch (error) {
         console.error("Reaction update error:", error);
         if (isReactionColumnUnavailableError(error)) {
@@ -2570,7 +2600,10 @@ async function announceTodoEncouragement(templateItem, metrics) {
     const text = `💕 ${templateItem?.emoji || "💕"} ${templateItem?.text || "A task"} finished\n${getTodoItemEncouragement(templateItem)}\n+${getTodoItemPoints(templateItem)} pts · ${categoryLabel}\nStreak: ${Math.max(state.loveStreak, 1)} day${Math.max(state.loveStreak, 1) === 1 ? "" : "s"} · Total: ${state.totalLoveScore}`;
 
     try {
-        await sendSystemMessage(text);
+        await sendSystemMessage(text, {
+            notifyTelegram: true,
+            telegramText: `💕 My Love finished: ${templateItem?.text || "A task"}\n${getTodoItemEncouragement(templateItem)}\n+${getTodoItemPoints(templateItem)} pts · ${categoryLabel}\nStreak: ${Math.max(state.loveStreak, 1)} day${Math.max(state.loveStreak, 1) === 1 ? "" : "s"} · Total: ${state.totalLoveScore}`
+        });
     } catch (error) {
         console.error("System encouragement message error:", error);
     }
@@ -2677,7 +2710,6 @@ window.toggleTodoItem = async function (itemId) {
     if (!wasDone && entry.done) {
         await refreshTodoScoreboard();
         await announceTodoEncouragement(templateItem, getTodoMetrics(state.todoToday));
-        sendTelegramNotification(`💕 My Love finished: ${templateItem?.text || itemId}\n${DAILY_TODO_ENCOURAGEMENT_MESSAGE}`);
     }
 };
 
