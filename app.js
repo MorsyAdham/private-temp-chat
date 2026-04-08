@@ -1298,6 +1298,7 @@ async function setupRealtimeSubscription() {
     };
 
     state.channel.on("broadcast", { event: "new-message" }, (p) => handleNewMessage(p.payload));
+    state.channel.on("broadcast", { event: "reaction-updated" }, (p) => applyMessageUpdate(p.payload));
 
     state.channel.on("broadcast", { event: "image-viewed" }, (p) => {
         const { messageId, viewerId } = p.payload;
@@ -1782,6 +1783,9 @@ async function toggleMessageReaction(messageId, emoji) {
         if (error) throw error;
         state.reactionSupport = "supabase";
         applyMessageUpdate(data);
+        if (state.channel) {
+            await state.channel.send({ type: "broadcast", event: "reaction-updated", payload: data });
+        }
 
         const actionText = hadUserReaction ? "removed" : "reacted";
         myLoveNotify(`${actionText} ${emoji} to ${getReactionMessagePreview(message)}`);
