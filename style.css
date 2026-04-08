@@ -1032,8 +1032,10 @@ body.app-view-enabled .jump-bottom {
 
 .message-bubble.system {
   align-self: center;
+  flex: 0 0 auto;
   position: relative;
   width: min(100%, 560px);
+  min-width: min(92%, 560px);
   max-width: min(92%, 560px);
   text-align: center;
   padding: 14px 22px 12px;

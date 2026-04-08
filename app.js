@@ -1481,7 +1481,7 @@ async function insertChatMessage(messageData) {
 
 async function sendSystemMessage(text, metadata = {}) {
     const systemMessage = await insertChatMessage({
-        sender: state.todoTemplate.owner,
+        sender: metadata.sender || state.currentUserEmail || state.todoTemplate.owner,
         text,
         message_type: "system",
         read: true
