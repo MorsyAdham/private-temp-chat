@@ -295,26 +295,40 @@
                     <div>
                         <p class="todo-kicker">💕 Daily love note</p>
                         <h3>🌸 Daily Checklist 💕</h3>
-                        <div id="todo-subtitle" class="todo-subtitle todo-total-card">A cute little reset for today.</div>
+                        <div class="todo-header-meta">
+                            <div id="todo-subtitle" class="todo-subtitle todo-total-card">A cute little reset for today.</div>
+                            <div id="todo-total-score-card" class="todo-total-card">
+                                <span class="todo-total-score-label">Total Love Score</span>
+                                <strong id="todo-total-score-text">💖 0</strong>
+                            </div>
+                        </div>
                     </div>
                     <button onclick="closeTodoModal()" class="icon-btn">
                         <span class="material-icons">close</span>
                     </button>
                 </div>
 
-            <div class="todo-stats">
-                <div class="todo-stat-card">
-                    <span class="todo-stat-label">Progress</span>
-                    <strong id="todo-progress-text">0 / 0 done</strong>
+            <div class="todo-summary-panel">
+                <div class="todo-stats">
+                    <div class="todo-stat-card">
+                        <span class="todo-stat-label">Progress</span>
+                        <strong id="todo-progress-text">0 / 0 done</strong>
+                    </div>
+                    <div class="todo-stat-card accent">
+                        <span class="todo-stat-label">Score</span>
+                        <strong id="todo-score-text">💕 0 points</strong>
+                    </div>
                 </div>
-                <div class="todo-stat-card accent">
-                    <span class="todo-stat-label">Score</span>
-                    <strong id="todo-score-text">💕 0 points</strong>
+
+                <div class="todo-nav-panel">
+                    <div id="todo-category-nav" class="todo-category-nav"></div>
+                    <div id="todo-week-nav" class="todo-week-nav"></div>
                 </div>
             </div>
 
-            <div id="todo-category-nav" class="todo-category-nav"></div>
-            <div id="todo-list" class="todo-list"></div>
+            <div class="todo-body-panel">
+                <div id="todo-list" class="todo-list"></div>
+            </div>
 
             <div class="todo-footer">
                 <p id="todo-footer-note">Good job baby 💕 Im so proud of you, keep going youre doing amazing 💕</p>

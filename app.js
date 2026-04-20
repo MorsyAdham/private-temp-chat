@@ -27,12 +27,17 @@ const ALLOWED_EMAILS = Object.keys(USER_NAMES);
 const TODO_CATEGORY_CONFIG = {
     daily: {
         label: "Daily",
-        description: "Fresh reset every day",
+        description: "Fresh reset by day, with a Sunday to Saturday view",
+        defaultPoints: 10
+    },
+    temporary: {
+        label: "One-Time",
+        description: "Add it for today only, then it clears tomorrow",
         defaultPoints: 10
     },
     weekly: {
         label: "Weekly",
-        description: "Carries through the current week",
+        description: "Carries through the current Sunday to Saturday week",
         defaultPoints: 25
     },
     extra: {
@@ -41,7 +46,17 @@ const TODO_CATEGORY_CONFIG = {
         defaultPoints: 15
     }
 };
-const TODO_CATEGORY_ORDER = ["daily", "weekly", "extra"];
+const TODO_CATEGORY_ORDER = ["daily", "weekly", "extra", "temporary"];
+const TODO_WEEKDAY_ORDER = [0, 1, 2, 3, 4, 5, 6];
+const TODO_WEEKDAY_META = [
+    { index: 0, short: "Sun", narrow: "S", full: "Sunday" },
+    { index: 1, short: "Mon", narrow: "M", full: "Monday" },
+    { index: 2, short: "Tue", narrow: "T", full: "Tuesday" },
+    { index: 3, short: "Wed", narrow: "W", full: "Wednesday" },
+    { index: 4, short: "Thu", narrow: "T", full: "Thursday" },
+    { index: 5, short: "Fri", narrow: "F", full: "Friday" },
+    { index: 6, short: "Sat", narrow: "S", full: "Saturday" }
+];
 const DEFAULT_REACTION_EMOJIS = ["❤️", "🥰", "😘", "😮", "😂", "😢"];
 const DAILY_TODO_TEMPLATE_TABLE = "daily_todo_templates";
 const TODO_REMINDER_STORAGE_KEY = "private-chat-todo-reminder-v1";
@@ -143,6 +158,8 @@ const state = {
     reactionSupport: "unknown",
     activeReactionPickerMessageId: null,
     activeTodoCategory: "daily",
+    activeTodoDateKey: "",
+    todoWeekRecords: {},
     headerToolsOpen: false,
     todoReminderWatcher: null
 };
@@ -303,21 +320,73 @@ function slugifyTodoText(text) {
 }
 
 function getTodayDateKey() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
+    return formatLocalDateKey(new Date());
+}
+
+function formatLocalDateKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
 }
 
 function getWeekKey(dateKey = getTodayDateKey()) {
     const base = new Date(`${dateKey}T12:00:00`);
-    const weekday = (base.getDay() + 6) % 7;
-    base.setDate(base.getDate() - weekday);
+    base.setDate(base.getDate() - base.getDay());
     const year = base.getFullYear();
     const month = String(base.getMonth() + 1).padStart(2, "0");
     const day = String(base.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+}
+
+function getTodoWeekdayMeta(dayIndex) {
+    return TODO_WEEKDAY_META.find(day => day.index === dayIndex) || TODO_WEEKDAY_META[0];
+}
+
+function getTodoWeekdayIndex(dateKey = getTodayDateKey()) {
+    return new Date(`${dateKey}T12:00:00`).getDay();
+}
+
+function getWeekDateKeys(dateKey = getTodayDateKey()) {
+    const base = new Date(`${getWeekKey(dateKey)}T12:00:00`);
+    return TODO_WEEKDAY_ORDER.map(offset => {
+        const current = new Date(base);
+        current.setDate(base.getDate() + offset);
+        return formatLocalDateKey(current);
+    });
+}
+
+function formatTodoDateLabel(dateKey, options = { weekday: "long", month: "short", day: "numeric" }) {
+    if (!dateKey) return "";
+    return new Date(`${dateKey}T12:00:00`).toLocaleDateString("en-US", options);
+}
+
+function normalizeTodoDaysOfWeek(item) {
+    if (getTodoCategory(item) !== "daily") return [];
+
+    const parsed = Array.isArray(item?.daysOfWeek)
+        ? [...new Set(item.daysOfWeek
+            .map(value => Number(value))
+            .filter(value => Number.isInteger(value) && value >= 0 && value <= 6))]
+            .sort((a, b) => a - b)
+        : [];
+
+    return parsed.length ? parsed : TODO_WEEKDAY_ORDER.slice();
+}
+
+function normalizeTodoActiveDate(item, fallbackDateKey = getTodayDateKey()) {
+    if (getTodoCategory(item) !== "temporary") return "";
+    return /^\d{4}-\d{2}-\d{2}$/.test(item?.activeDate || "") ? item.activeDate : fallbackDateKey;
+}
+
+function isTodoItemScheduledForDate(item, dateKey = getTodayDateKey()) {
+    if (getTodoCategory(item) !== "daily") return true;
+    return normalizeTodoDaysOfWeek(item).includes(getTodoWeekdayIndex(dateKey));
+}
+
+function isTodoItemActiveForDate(item, dateKey = getTodayDateKey()) {
+    if (getTodoCategory(item) !== "temporary") return true;
+    return normalizeTodoActiveDate(item, dateKey) === dateKey;
 }
 
 function getTodoCategory(item) {
@@ -336,10 +405,15 @@ function getTodoItemEncouragement(item) {
     return (item?.encouragement || "").trim() || DAILY_TODO_ENCOURAGEMENT_MESSAGE;
 }
 
-function getActiveTodoItems() {
+function getActiveTodoItems(dateKey = getTodayDateKey()) {
     return state.todoTemplate.items
         .filter(item => item.active !== false)
+        .filter(item => isTodoItemActiveForDate(item, dateKey))
         .sort((a, b) => a.order - b.order);
+}
+
+function getScheduledTodoItems(dateKey = getTodayDateKey()) {
+    return getActiveTodoItems(dateKey).filter(item => isTodoItemScheduledForDate(item, dateKey));
 }
 
 function normalizeTodoTemplate(template) {
@@ -358,6 +432,8 @@ function normalizeTodoTemplate(template) {
                 category,
                 encouragement: getTodoItemEncouragement(item),
                 points: getTodoItemPoints({ ...item, category }),
+                daysOfWeek: category === "daily" ? normalizeTodoDaysOfWeek(item) : [],
+                activeDate: category === "temporary" ? normalizeTodoActiveDate(item) : "",
                 order: Number.isFinite(Number(item?.order)) ? Number(item.order) : index + 1,
                 active: item?.active !== false
             };
@@ -368,7 +444,7 @@ function normalizeTodoTemplate(template) {
 function createTodoRecord(dateKey = getTodayDateKey(), carryoverRecord = null) {
     const weekKey = getWeekKey(dateKey);
     const carryItems = Array.isArray(carryoverRecord?.items) ? carryoverRecord.items : [];
-    const items = getActiveTodoItems().map(item => {
+    const items = getActiveTodoItems(dateKey).map(item => {
         const carry = carryItems.find(source => (source.itemId || source.id) === item.id);
         const isWeekly = getTodoCategory(item) === "weekly";
         return {
@@ -488,6 +564,26 @@ async function fetchTodoRecordFromChatMessages(dateKey = getTodayDateKey()) {
     return match ? extractTodoRecordFromMessage(match) : null;
 }
 
+async function fetchTodoWeekRecordsFromChatMessages(dateKey = getTodayDateKey()) {
+    const weekDateKeys = new Set(getWeekDateKeys(dateKey));
+    const { data, error } = await state.supabaseClient
+        .from("chat_messages")
+        .select("id, sender, text, message_type, created_at")
+        .eq("message_type", "text")
+        .like("text", `${DAILY_TODO_SYNC_PREFIX}%`)
+        .order("created_at", { ascending: false })
+        .limit(200);
+
+    if (error) throw error;
+
+    return (data || []).reduce((records, message) => {
+        const record = extractTodoRecordFromMessage(message);
+        if (!record || !weekDateKeys.has(record.dateKey) || records[record.dateKey]) return records;
+        records[record.dateKey] = record;
+        return records;
+    }, {});
+}
+
 async function syncTodoRecordToChatMessages(record) {
     const normalized = normalizeTodoRecord(record);
     const { data, error } = await state.supabaseClient
@@ -583,13 +679,13 @@ async function syncTodoTemplateToSupabase(template = state.todoTemplate) {
 async function fetchCarryoverWeeklyRecord(dateKey = getTodayDateKey()) {
     if (!state.supabaseClient || state.todoSyncMode === "local" || state.todoSyncMode === "chat") return null;
 
-    const weekKey = getWeekKey(dateKey);
+    const weekStart = getWeekDateKeys(dateKey)[0];
     const { data, error } = await state.supabaseClient
         .from(DAILY_TODO_TABLE)
         .select("template_id, target_email, date_key, week_key, items_json")
         .eq("template_id", state.todoTemplate.id)
         .eq("target_email", state.todoTemplate.targetUser)
-        .eq("week_key", weekKey)
+        .gte("date_key", weekStart)
         .lt("date_key", dateKey)
         .order("date_key", { ascending: false })
         .limit(1)
@@ -661,6 +757,39 @@ async function syncTodoRecordToSupabase(record) {
     return mapTodoRowToRecord(data);
 }
 
+async function fetchTodoRecordsForWeek(dateKey = getTodayDateKey()) {
+    if (!state.supabaseClient || state.todoSyncMode === "local") return {};
+    if (state.todoSyncMode === "chat") return fetchTodoWeekRecordsFromChatMessages(dateKey);
+
+    const weekDateKeys = getWeekDateKeys(dateKey);
+    const weekStart = weekDateKeys[0];
+    const weekEnd = weekDateKeys[weekDateKeys.length - 1];
+    const { data, error } = await state.supabaseClient
+        .from(DAILY_TODO_TABLE)
+        .select("template_id, target_email, date_key, week_key, items_json")
+        .eq("template_id", state.todoTemplate.id)
+        .eq("target_email", state.todoTemplate.targetUser)
+        .gte("date_key", weekStart)
+        .lte("date_key", weekEnd)
+        .order("date_key", { ascending: true });
+
+    if (error) {
+        if (isTodoTableUnavailableError(error)) {
+            state.todoSyncMode = "chat";
+            console.warn("Todo sync table is unavailable. Using hidden chat-based checklist sync.");
+            return fetchTodoWeekRecordsFromChatMessages(dateKey);
+        }
+
+        throw error;
+    }
+
+    state.todoSyncMode = "supabase";
+    return (data || []).reduce((records, row) => {
+        records[row.date_key] = mapTodoRowToRecord(row);
+        return records;
+    }, {});
+}
+
 function getStoredTodoRecord() {
     try {
         const raw = localStorage.getItem(DAILY_TODO_STORAGE_KEY);
@@ -672,9 +801,103 @@ function getStoredTodoRecord() {
     }
 }
 
+function buildTodoWeekRecordMap(anchorDateKey = getTodayDateKey(), sourceRecords = {}) {
+    const recordMap = {};
+    let carryoverRecord = null;
+
+    getWeekDateKeys(anchorDateKey).forEach(dateKey => {
+        const sourceRecord = sourceRecords[dateKey];
+        const record = sourceRecord
+            ? normalizeTodoRecord(sourceRecord, dateKey)
+            : createTodoRecord(dateKey, carryoverRecord);
+        recordMap[dateKey] = record;
+        carryoverRecord = record;
+    });
+
+    return recordMap;
+}
+
+function removeExpiredTemporaryTodoItems(template = state.todoTemplate, todayKey = getTodayDateKey()) {
+    const normalized = normalizeTodoTemplate(template);
+    const items = normalized.items.filter(item =>
+        getTodoCategory(item) !== "temporary" || normalizeTodoActiveDate(item, todayKey) === todayKey
+    );
+
+    if (items.length === normalized.items.length) return normalized;
+    return { ...normalized, items };
+}
+
+async function pruneExpiredTemporaryTodoItems(todayKey = getTodayDateKey()) {
+    const cleanedTemplate = removeExpiredTemporaryTodoItems(state.todoTemplate, todayKey);
+    if (cleanedTemplate.items.length === state.todoTemplate.items.length) return;
+
+    state.todoTemplate = cleanedTemplate;
+    if (state.todoToday) {
+        state.todoToday = normalizeTodoRecord(state.todoToday);
+        saveTodoRecord(state.todoToday);
+    }
+
+    if (!state.supabaseClient || state.todoTemplateSyncMode === "local") return;
+
+    try {
+        state.todoTemplate = await syncTodoTemplateToSupabase(cleanedTemplate);
+        if (state.todoToday) {
+            state.todoToday = normalizeTodoRecord(state.todoToday);
+            saveTodoRecord(state.todoToday);
+        }
+    } catch (error) {
+        console.error("Temporary todo cleanup error:", error);
+    }
+}
+
+function syncTodoWeekRecords(record = state.todoToday) {
+    const currentRecord = record ? normalizeTodoRecord(record) : null;
+    const todayKey = currentRecord?.dateKey || getTodayDateKey();
+    const sameWeek = getWeekKey(state.activeTodoDateKey || todayKey) === getWeekKey(todayKey);
+    const sourceRecords = sameWeek ? { ...state.todoWeekRecords } : {};
+    if (currentRecord) sourceRecords[todayKey] = currentRecord;
+    state.todoWeekRecords = buildTodoWeekRecordMap(todayKey, sourceRecords);
+    if (!sameWeek || !state.activeTodoDateKey || !state.todoWeekRecords[state.activeTodoDateKey]) {
+        state.activeTodoDateKey = todayKey;
+    }
+}
+
+function getTodoRecordForDate(dateKey = getTodayDateKey()) {
+    if (!dateKey) return null;
+    if (state.todoWeekRecords?.[dateKey]) return state.todoWeekRecords[dateKey];
+    if (state.todoToday?.dateKey === dateKey) return state.todoToday;
+    return null;
+}
+
+async function ensureCurrentTodoWeekRecords() {
+    const todayKey = getTodayDateKey();
+    const storedRecord = getStoredTodoRecord();
+    let sourceRecords = {};
+
+    try {
+        sourceRecords = await fetchTodoRecordsForWeek(todayKey);
+    } catch (error) {
+        console.error("Todo week sync error:", error);
+    }
+
+    if (storedRecord && getWeekKey(storedRecord.dateKey) === getWeekKey(todayKey)) {
+        sourceRecords[storedRecord.dateKey] = storedRecord;
+    }
+
+    if (state.todoToday && getWeekKey(state.todoToday.dateKey) === getWeekKey(todayKey)) {
+        sourceRecords[state.todoToday.dateKey] = state.todoToday;
+    }
+
+    state.todoWeekRecords = buildTodoWeekRecordMap(todayKey, sourceRecords);
+    if (!state.activeTodoDateKey || !state.todoWeekRecords[state.activeTodoDateKey]) {
+        state.activeTodoDateKey = todayKey;
+    }
+}
+
 function saveTodoRecord(record) {
     const normalized = normalizeTodoRecord(record);
     state.todoToday = normalized;
+    syncTodoWeekRecords(normalized);
     localStorage.setItem(DAILY_TODO_STORAGE_KEY, JSON.stringify(normalized));
     return normalized;
 }
@@ -814,10 +1037,10 @@ window.toggleAppView = async function () {
     await requestBrowserFullscreen();
 };
 
-function getTodoMetrics(record = state.todoToday, category = null) {
+function getTodoMetrics(record = state.todoToday, category = null, dateKey = record?.dateKey || getTodayDateKey()) {
     const activeItems = category
-        ? getActiveTodoItems().filter(item => getTodoCategory(item) === category)
-        : getActiveTodoItems();
+        ? getScheduledTodoItems(dateKey).filter(item => getTodoCategory(item) === category)
+        : getScheduledTodoItems(dateKey);
     const totalCount = activeItems.length;
     const completedEntries = (record?.items || []).filter(item =>
         item.done && activeItems.some(templateItem => templateItem.id === item.itemId)
@@ -844,10 +1067,10 @@ function getTodoMetrics(record = state.todoToday, category = null) {
     };
 }
 
-function getCombinedTodoScore(record = state.todoToday) {
+function getCombinedTodoScore(record = state.todoToday, dateKey = record?.dateKey || getTodayDateKey()) {
     return TODO_CATEGORY_ORDER.reduce((sum, category) => {
-        if (!getTodoItemsByCategory(category).length) return sum;
-        return sum + getTodoMetrics(record, category).score;
+        if (!getTodoItemsByCategory(category, dateKey).length) return sum;
+        return sum + getTodoMetrics(record, category, dateKey).score;
     }, 0);
 }
 
@@ -870,7 +1093,7 @@ function getTodoDayEndMessage(metrics = getTodoMetrics()) {
 async function sendTodoDaySummary(record) {
     if (!record || record.summarySent) return;
 
-    const metrics = getTodoMetrics(record);
+    const metrics = getTodoMetrics(record, null, record.dateKey);
     const message = `💕 End of day update for My Love\n🌸 Daily Checklist\n${metrics.completedCount}/${metrics.totalCount} tasks done\nScore: ${metrics.score}\nReward: ${metrics.rewardLabel}\n${getTodoDayEndMessage(metrics)}`;
 
     try {
@@ -977,6 +1200,8 @@ async function ensureCurrentTodoRecord() {
         state.todoTemplate = normalizeTodoTemplate(DAILY_TODO_TEMPLATE);
     }
 
+    await pruneExpiredTemporaryTodoItems();
+
     const todayKey = getTodayDateKey();
     const storedRecord = getStoredTodoRecord();
 
@@ -1008,6 +1233,8 @@ async function ensureCurrentTodoRecord() {
         saveTodoRecord(record);
     }
 
+    state.activeTodoDateKey = todayKey;
+    await ensureCurrentTodoWeekRecords();
     await refreshTodoScoreboard();
 }
 
@@ -1337,9 +1564,16 @@ async function setupRealtimeSubscription() {
             if (!row) return;
             if (row.template_id !== state.todoTemplate.id) return;
             if (row.target_email !== state.todoTemplate.targetUser) return;
-            if (row.date_key !== getTodayDateKey()) return;
+            if (!getWeekDateKeys().includes(row.date_key)) return;
 
-            saveTodoRecord(mapTodoRowToRecord(row));
+            const record = mapTodoRowToRecord(row);
+            if (row.date_key === getTodayDateKey()) {
+                saveTodoRecord(record);
+            } else {
+                const sourceRecords = { ...state.todoWeekRecords, [row.date_key]: record };
+                if (state.todoToday) sourceRecords[state.todoToday.dateKey] = state.todoToday;
+                state.todoWeekRecords = buildTodoWeekRecordMap(getTodayDateKey(), sourceRecords);
+            }
             refreshTodoScoreboard();
             renderTodoModal();
         });
@@ -1356,6 +1590,7 @@ async function setupRealtimeSubscription() {
                 state.todoToday = normalizeTodoRecord(state.todoToday);
                 saveTodoRecord(state.todoToday);
             }
+            ensureCurrentTodoWeekRecords();
             renderTodoModal();
         });
     }
@@ -2340,12 +2575,36 @@ function renderLoveStatsBar() {
     if (streakCard) streakCard.dataset.level = getProgressLevel(state.loveStreak, { low: 1, medium: 3, high: 7, peak: 14 });
 }
 
-function getTodoItemsByCategory(category) {
-    return getActiveTodoItems().filter(item => getTodoCategory(item) === category);
+function getTodoItemsByCategory(category, dateKey = getTodayDateKey()) {
+    return getActiveTodoItems(dateKey).filter(item => getTodoCategory(item) === category);
 }
 
-function getTodoCategoryProgress(category, record = state.todoToday) {
-    const items = getTodoItemsByCategory(category);
+function getVisibleTodoCategories(dateKey = getTodayDateKey()) {
+    return TODO_CATEGORY_ORDER.filter(category => {
+        if (isNobody()) return true;
+        return getTodoItemsByCategory(category, dateKey).length > 0;
+    });
+}
+
+function getScheduledTodoItemsByCategory(category, dateKey = getTodayDateKey()) {
+    return getTodoItemsByCategory(category, dateKey).filter(item => isTodoItemScheduledForDate(item, dateKey));
+}
+
+function getTodoViewDateKey(category = state.activeTodoCategory) {
+    return category === "daily" ? (state.activeTodoDateKey || getTodayDateKey()) : getTodayDateKey();
+}
+
+function getTodoViewRecord(category = state.activeTodoCategory) {
+    const dateKey = getTodoViewDateKey(category);
+    return getTodoRecordForDate(dateKey) || createTodoRecord(dateKey);
+}
+
+function isTodoDateEditable(dateKey = getTodayDateKey()) {
+    return dateKey === getTodayDateKey();
+}
+
+function getTodoCategoryProgress(category, record = state.todoToday, dateKey = record?.dateKey || getTodayDateKey()) {
+    const items = getScheduledTodoItemsByCategory(category, dateKey);
     const entries = Array.isArray(record?.items) ? record.items : [];
     const completedCount = items.reduce((sum, item) => {
         const entry = entries.find(progressItem => progressItem.itemId === item.id);
@@ -2361,11 +2620,14 @@ function getTodoCategoryProgress(category, record = state.todoToday) {
 window.setTodoCategory = function (category) {
     if (!TODO_CATEGORY_CONFIG[category]) return;
     state.activeTodoCategory = category;
+    if (category === "daily" && !state.activeTodoDateKey) {
+        state.activeTodoDateKey = getTodayDateKey();
+    }
     renderTodoModal();
 };
 
 function ensureValidActiveTodoCategory() {
-    const visibleCategories = TODO_CATEGORY_ORDER.filter(category => getTodoItemsByCategory(category).length);
+    const visibleCategories = getVisibleTodoCategories();
     if (!visibleCategories.length) {
         state.activeTodoCategory = "daily";
         return;
@@ -2376,25 +2638,106 @@ function ensureValidActiveTodoCategory() {
     }
 }
 
+window.setTodoActiveDate = function (dateKey) {
+    if (!dateKey || !state.todoWeekRecords?.[dateKey]) return;
+    state.activeTodoDateKey = dateKey;
+    renderTodoModal();
+};
+
 function renderTodoCategoryNav(container) {
     if (!container) return;
     ensureValidActiveTodoCategory();
     container.innerHTML = "";
 
-    TODO_CATEGORY_ORDER
-        .filter(category => getTodoItemsByCategory(category).length)
+    getVisibleTodoCategories()
         .forEach(category => {
-            const progress = getTodoCategoryProgress(category);
+            const dateKey = category === "daily" ? getTodoViewDateKey("daily") : getTodayDateKey();
+            const record = category === "daily" ? getTodoViewRecord("daily") : state.todoToday;
+            const progress = getTodoCategoryProgress(category, record, dateKey);
             const button = document.createElement("button");
             button.type = "button";
             button.className = `todo-category-tab ${state.activeTodoCategory === category ? "active" : ""}`;
             button.innerHTML = `
-                <strong>${escapeHtml(TODO_CATEGORY_CONFIG[category].label)}</strong>
-                <span>${progress.completedCount}/${progress.totalCount} done</span>
+                <div class="todo-category-tab-top">
+                    <strong>${escapeHtml(TODO_CATEGORY_CONFIG[category].label)}</strong>
+                </div>
+                <span class="todo-category-tab-meta">${progress.completedCount}/${progress.totalCount} done</span>
             `;
             button.onclick = () => setTodoCategory(category);
             container.appendChild(button);
         });
+}
+
+function renderTodoWeekNav(container) {
+    if (!container) return;
+
+    if (state.activeTodoCategory !== "daily" || !getTodoItemsByCategory("daily").length) {
+        container.innerHTML = "";
+        container.style.display = "none";
+        return;
+    }
+
+    const todayKey = getTodayDateKey();
+    const activeDateKey = getTodoViewDateKey("daily");
+    const weekDateKeys = getWeekDateKeys(todayKey);
+    container.style.display = "grid";
+    container.innerHTML = "";
+
+    weekDateKeys.forEach(dateKey => {
+        const dayMeta = getTodoWeekdayMeta(getTodoWeekdayIndex(dateKey));
+        const record = getTodoRecordForDate(dateKey) || createTodoRecord(dateKey);
+        const progress = getTodoCategoryProgress("daily", record, dateKey);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `todo-weekday-tab ${activeDateKey === dateKey ? "active" : ""} ${todayKey === dateKey ? "today" : ""}`;
+        button.innerHTML = `
+            <strong>${dayMeta.short}</strong>
+            <span>${new Date(`${dateKey}T12:00:00`).getDate()}</span>
+            <small>${progress.completedCount}/${progress.totalCount}</small>
+        `;
+        button.onclick = () => setTodoActiveDate(dateKey);
+        container.appendChild(button);
+    });
+}
+
+function renderTodoEditorDayButtons(selectedDays = [], options = {}) {
+    const mode = options.mode || "draft";
+    const itemId = options.itemId || "";
+    return TODO_WEEKDAY_META.map(day => {
+        const isActive = selectedDays.includes(day.index);
+        const action = mode === "draft"
+            ? `toggleTodoDraftDay(${day.index})`
+            : `toggleTodoTemplateItemDay('${itemId}', ${day.index})`;
+        return `
+            <button type="button"
+                class="todo-editor-day ${isActive ? "active" : ""}"
+                ${mode === "draft" ? `data-draft-day="${day.index}"` : ""}
+                onclick="${action}">${day.short}</button>
+        `;
+    }).join("");
+}
+
+function getSelectedTodoDraftDays() {
+    return Array.from(document.querySelectorAll(".todo-editor-composer [data-draft-day].active"))
+        .map(button => Number(button.dataset.draftDay))
+        .filter(value => Number.isInteger(value) && value >= 0 && value <= 6)
+        .sort((a, b) => a - b);
+}
+
+window.toggleTodoDraftDay = function (dayIndex) {
+    const button = document.querySelector(`.todo-editor-composer [data-draft-day="${dayIndex}"]`);
+    if (!button) return;
+
+    const activeButtons = document.querySelectorAll(".todo-editor-composer [data-draft-day].active");
+    if (button.classList.contains("active") && activeButtons.length === 1) return;
+    button.classList.toggle("active");
+};
+
+function resequenceTodoTemplateItems(items = []) {
+    return items.map((item, index) => ({
+        ...item,
+        order: index + 1
+    }));
 }
 
 function renderTodoTemplateEditor(list) {
@@ -2404,48 +2747,148 @@ function renderTodoTemplateEditor(list) {
     const items = getTodoItemsByCategory(category);
     const editor = document.createElement("div");
     editor.className = "todo-editor";
+    const categoryLabel = TODO_CATEGORY_CONFIG[category].label;
+    const currentDayIndex = getTodoWeekdayIndex();
     editor.innerHTML = `
         <div class="todo-editor-header">
-            <strong>Edit ${TODO_CATEGORY_CONFIG[category].label}</strong>
-            <span>Only the currently open category is editable here.</span>
+            <strong>Organize ${categoryLabel}</strong>
+            <span>Add a new task first, then adjust the cards below if you want to fine-tune the details.</span>
         </div>
     `;
+
+    const composer = document.createElement("div");
+    composer.className = "todo-editor-composer";
+    composer.innerHTML = `
+        <div class="todo-editor-composer-header">
+            <div>
+                <strong>Add New ${categoryLabel} Task</strong>
+                <p>${category === "daily"
+                    ? "Choose where the task shows up during the Sunday to Saturday week."
+                    : category === "temporary"
+                        ? "These tasks are only for today and disappear automatically tomorrow."
+                    : TODO_CATEGORY_CONFIG[category].description}</p>
+            </div>
+            <button type="button" class="todo-mini-btn todo-mini-btn-accent" onclick="addTodoTemplateItemFromForm('${category}')">
+                <span class="material-icons">add</span>
+                Create task
+            </button>
+        </div>
+        <div class="todo-editor-grid">
+            <label class="todo-editor-field todo-editor-field-emoji">
+                <span>Emoji</span>
+                <input type="text" id="todo-new-item-emoji" class="todo-editor-emoji" value="💕" maxlength="4">
+            </label>
+            <label class="todo-editor-field">
+                <span>Task title</span>
+                <input type="text" id="todo-new-item-text" class="todo-editor-text" value="" placeholder="Write the task clearly">
+            </label>
+            <label class="todo-editor-field todo-editor-field-points">
+                <span>Points</span>
+                <input type="number" id="todo-new-item-points" class="todo-editor-points" min="1" max="100" value="${TODO_CATEGORY_CONFIG[category]?.defaultPoints || 10}">
+            </label>
+        </div>
+        <label class="todo-editor-field">
+            <span>Encouragement message</span>
+            <textarea id="todo-new-item-note" class="todo-editor-note" rows="2" placeholder="Cute message after the task gets checked">${escapeHtml(DAILY_TODO_ENCOURAGEMENT_MESSAGE)}</textarea>
+        </label>
+        ${category === "daily" ? `
+            <div class="todo-editor-schedule todo-editor-schedule-panel">
+                <span class="todo-editor-schedule-label">Show on these days</span>
+                <div class="todo-editor-days">
+                    ${renderTodoEditorDayButtons([currentDayIndex], { mode: "draft" })}
+                </div>
+            </div>
+        ` : category === "temporary" ? `
+            <div class="todo-editor-schedule todo-editor-schedule-panel">
+                <span class="todo-editor-schedule-label">Availability</span>
+                <p>This task will only stay in the One-Time list for today.</p>
+            </div>
+        ` : ""}
+    `;
+    editor.appendChild(composer);
 
     const section = document.createElement("div");
     section.className = "todo-editor-section";
 
     const header = document.createElement("div");
-    header.className = "todo-category-header";
+    header.className = "todo-editor-list-header";
     header.innerHTML = `
         <div>
-            <strong>${TODO_CATEGORY_CONFIG[category].label}</strong>
-            <p>${TODO_CATEGORY_CONFIG[category].description}</p>
+            <strong>Current ${categoryLabel} Tasks</strong>
+            <p>${items.length} task${items.length === 1 ? "" : "s"} in this category.</p>
         </div>
-        <button type="button" class="todo-mini-btn" onclick="addTodoTemplateItem('${category}')">
-            <span class="material-icons">add</span>
-            Add
-        </button>
     `;
     section.appendChild(header);
 
     items.forEach(item => {
         const row = document.createElement("div");
         row.className = "todo-editor-item";
+        const itemDays = normalizeTodoDaysOfWeek(item);
+        const itemIndex = items.findIndex(entry => entry.id === item.id);
+        const isFirstItem = itemIndex <= 0;
+        const isLastItem = itemIndex === items.length - 1;
         row.innerHTML = `
-            <div class="todo-editor-row">
-                <input type="text" class="todo-editor-emoji" value="${escapeHtml(item.emoji || "💕")}" maxlength="4"
-                    onchange="updateTodoTemplateItem('${item.id}', 'emoji', this.value)">
-                <input type="text" class="todo-editor-text" value="${escapeHtml(item.text)}"
-                    onchange="updateTodoTemplateItem('${item.id}', 'text', this.value)">
-                <input type="number" class="todo-editor-points" min="1" max="100" value="${getTodoItemPoints(item)}"
-                    onchange="updateTodoTemplateItem('${item.id}', 'points', this.value)">
-                <button type="button" class="todo-mini-btn icon-only" onclick="removeTodoTemplateItem('${item.id}')">
-                    <span class="material-icons">delete</span>
-                </button>
+            <div class="todo-editor-item-header">
+                <div>
+                    <strong>${escapeHtml(item.text)}</strong>
+                    <span>${categoryLabel} task</span>
+                </div>
+                <div class="todo-editor-item-actions">
+                    <button type="button" class="todo-mini-btn icon-only" ${isFirstItem ? "disabled" : ""} onclick="moveTodoTemplateItem('${item.id}', 'up')" title="Move up">
+                        <span class="material-icons">keyboard_arrow_up</span>
+                    </button>
+                    <button type="button" class="todo-mini-btn icon-only" ${isLastItem ? "disabled" : ""} onclick="moveTodoTemplateItem('${item.id}', 'down')" title="Move down">
+                        <span class="material-icons">keyboard_arrow_down</span>
+                    </button>
+                    <button type="button" class="todo-mini-btn icon-only" onclick="removeTodoTemplateItem('${item.id}')" title="Delete task">
+                        <span class="material-icons">delete</span>
+                    </button>
+                </div>
             </div>
-            <textarea class="todo-editor-note" rows="2"
-                onchange="updateTodoTemplateItem('${item.id}', 'encouragement', this.value)">${escapeHtml(getTodoItemEncouragement(item))}</textarea>
+            <div class="todo-editor-grid">
+                <label class="todo-editor-field todo-editor-field-emoji">
+                    <span>Emoji</span>
+                    <input type="text" class="todo-editor-emoji" value="${escapeHtml(item.emoji || "💕")}" maxlength="4"
+                        onchange="updateTodoTemplateItem('${item.id}', 'emoji', this.value)">
+                </label>
+                <label class="todo-editor-field">
+                    <span>Task title</span>
+                    <input type="text" class="todo-editor-text" value="${escapeHtml(item.text)}"
+                        onchange="updateTodoTemplateItem('${item.id}', 'text', this.value)">
+                </label>
+                <label class="todo-editor-field todo-editor-field-points">
+                    <span>Points</span>
+                    <input type="number" class="todo-editor-points" min="1" max="100" value="${getTodoItemPoints(item)}"
+                        onchange="updateTodoTemplateItem('${item.id}', 'points', this.value)">
+                </label>
+            </div>
+            <label class="todo-editor-field">
+                <span>Encouragement message</span>
+                <textarea class="todo-editor-note" rows="2"
+                    onchange="updateTodoTemplateItem('${item.id}', 'encouragement', this.value)">${escapeHtml(getTodoItemEncouragement(item))}</textarea>
+            </label>
         `;
+
+        if (category === "daily") {
+            const schedule = document.createElement("div");
+            schedule.className = "todo-editor-schedule";
+            schedule.innerHTML = `
+                <span class="todo-editor-schedule-label">Show on</span>
+                <div class="todo-editor-days">
+                    ${renderTodoEditorDayButtons(itemDays, { mode: "item", itemId: item.id })}
+                </div>
+            `;
+            row.appendChild(schedule);
+        } else if (category === "temporary") {
+            const schedule = document.createElement("div");
+            schedule.className = "todo-editor-schedule";
+            schedule.innerHTML = `
+                <span class="todo-editor-schedule-label">Availability</span>
+                <p>Visible on ${formatTodoDateLabel(normalizeTodoActiveDate(item))} only, then removed automatically.</p>
+            `;
+            row.appendChild(schedule);
+        }
+
         section.appendChild(row);
     });
 
@@ -2457,13 +2900,15 @@ function renderTodoTemplateEditor(list) {
 function renderTodoModal() {
     const list = document.getElementById("todo-list");
     const categoryNav = document.getElementById("todo-category-nav");
+    const weekNav = document.getElementById("todo-week-nav");
     const progressText = document.getElementById("todo-progress-text");
     const scoreText = document.getElementById("todo-score-text");
+    const totalScoreText = document.getElementById("todo-total-score-text");
     const subtitle = document.getElementById("todo-subtitle");
     const footerNote = document.getElementById("todo-footer-note");
     const todoBtn = document.getElementById("todo-btn");
 
-    if (!list || !categoryNav || !progressText || !scoreText || !subtitle || !footerNote || !todoBtn) return;
+    if (!list || !categoryNav || !weekNav || !progressText || !scoreText || !totalScoreText || !subtitle || !footerNote || !todoBtn) return;
 
     if (!state.currentUserEmail || (!isMyLove() && !isNobody())) {
         todoBtn.style.display = "none";
@@ -2477,28 +2922,47 @@ function renderTodoModal() {
         saveTodoRecord(state.todoToday);
     }
 
-    const metrics = getTodoMetrics(state.todoToday, state.activeTodoCategory);
+    const viewDateKey = getTodoViewDateKey();
+    const viewRecord = getTodoViewRecord();
+    const isViewingToday = isTodoDateEditable(viewDateKey);
+    const metrics = getTodoMetrics(viewRecord, state.activeTodoCategory, viewDateKey);
     const categoryLabel = TODO_CATEGORY_CONFIG[state.activeTodoCategory]?.label || "Checklist";
     progressText.textContent = `${metrics.completedCount} / ${metrics.totalCount} ${categoryLabel.toLowerCase()} done`;
     scoreText.textContent = `💕 ${metrics.score} ${categoryLabel.toLowerCase()} points`;
+    totalScoreText.textContent = `💖 ${state.totalLoveScore}`;
     scoreText.dataset.level = getProgressLevel(metrics.percent, { low: 1, medium: 40, high: 75, peak: 100 });
     renderLoveStatsBar();
 
     if (isMyLove()) {
-        subtitle.textContent = `💖 Total Love Score: ${state.totalLoveScore}`;
-        footerNote.textContent = DAILY_TODO_ENCOURAGEMENT_MESSAGE;
+        subtitle.textContent = state.activeTodoCategory === "daily"
+            ? `🌸 ${formatTodoDateLabel(viewDateKey)}`
+            : `🌸 ${categoryLabel} checklist`;
+        if (state.activeTodoCategory === "daily" && !isViewingToday) {
+            footerNote.textContent = viewDateKey < getTodayDateKey()
+                ? `Saved progress from ${formatTodoDateLabel(viewDateKey)} stays here, but only today's daily list can be edited.`
+                : `You can preview ${formatTodoDateLabel(viewDateKey)} here, but it only becomes checkable on that day.`;
+        } else {
+            footerNote.textContent = DAILY_TODO_ENCOURAGEMENT_MESSAGE;
+        }
     } else if (isNobody()) {
-        subtitle.textContent = `💖 Total Love Score: ${state.totalLoveScore}`;
-        footerNote.textContent = `Today My Love has finished ${metrics.completedCount} of ${metrics.totalCount} tasks and collected ${metrics.score} points.`;
+        subtitle.textContent = state.activeTodoCategory === "daily"
+            ? `🌸 ${formatTodoDateLabel(viewDateKey)}`
+            : `🌸 ${categoryLabel} checklist`;
+        footerNote.textContent = state.activeTodoCategory === "daily"
+            ? `On ${formatTodoDateLabel(viewDateKey)} My Love has finished ${metrics.completedCount} of ${metrics.totalCount} tasks and collected ${metrics.score} points.`
+            : `Today My Love has finished ${metrics.completedCount} of ${metrics.totalCount} tasks and collected ${metrics.score} points.`;
     } else {
-        subtitle.textContent = `💖 Total Love Score: ${state.totalLoveScore}`;
+        subtitle.textContent = state.activeTodoCategory === "daily"
+            ? `🌸 ${formatTodoDateLabel(viewDateKey)}`
+            : `🌸 ${categoryLabel} checklist`;
         footerNote.textContent = "Read-only view.";
     }
 
     list.innerHTML = "";
     renderTodoCategoryNav(categoryNav);
+    renderTodoWeekNav(weekNav);
 
-    const activeItems = getTodoItemsByCategory(state.activeTodoCategory);
+    const activeItems = getScheduledTodoItemsByCategory(state.activeTodoCategory, viewDateKey);
     if (activeItems.length) {
         const section = document.createElement("div");
         section.className = "todo-category-section";
@@ -2508,14 +2972,16 @@ function renderTodoModal() {
         sectionHeader.innerHTML = `
             <div>
                 <strong>${TODO_CATEGORY_CONFIG[state.activeTodoCategory].label}</strong>
-                <p>${TODO_CATEGORY_CONFIG[state.activeTodoCategory].description}</p>
+                <p>${state.activeTodoCategory === "daily"
+                    ? `${formatTodoDateLabel(viewDateKey)} · ${TODO_CATEGORY_CONFIG[state.activeTodoCategory].description}`
+                    : TODO_CATEGORY_CONFIG[state.activeTodoCategory].description}</p>
             </div>
         `;
         section.appendChild(sectionHeader);
 
         activeItems.forEach(item => {
-            const progress = state.todoToday.items.find(entry => entry.itemId === item.id) || { done: false, completedAt: null };
-            const canToggle = isMyLove();
+            const progress = viewRecord.items.find(entry => entry.itemId === item.id) || { done: false, completedAt: null };
+            const canToggle = isMyLove() && isViewingToday;
 
             const row = document.createElement("div");
             row.className = `todo-item ${progress.done ? "completed" : ""}`;
@@ -2527,7 +2993,15 @@ function renderTodoModal() {
                 </label>
                 <div class="todo-item-content">
                     <strong>${escapeHtml(item.emoji || "💕")} ${escapeHtml(item.text)}</strong>
-                    <p>${progress.done ? `Done at ${formatTime(progress.completedAt)} · +${getTodoItemPoints(item)} pts` : (canToggle ? `Tap when it's done · worth ${getTodoItemPoints(item)} pts` : "My Love can check this item from her account.")}</p>
+                    <p>${progress.done
+                        ? `Done at ${formatTime(progress.completedAt)} · +${getTodoItemPoints(item)} pts`
+                        : (canToggle
+                            ? `Tap when it's done · worth ${getTodoItemPoints(item)} pts`
+                            : (state.activeTodoCategory === "daily" && !isViewingToday
+                                ? (viewDateKey < getTodayDateKey()
+                                    ? "Past daily tasks stay visible here, but they can no longer be edited."
+                                    : "Future daily tasks can be previewed here and checked on their day.")
+                                : "My Love can check this item from her account."))}</p>
                 </div>
             `;
 
@@ -2535,6 +3009,16 @@ function renderTodoModal() {
         });
 
         list.appendChild(section);
+    } else {
+        const empty = document.createElement("div");
+        empty.className = "todo-empty-state";
+        empty.innerHTML = `
+            <strong>No tasks here yet</strong>
+            <p>${state.activeTodoCategory === "daily"
+                ? `There are no daily tasks scheduled for ${formatTodoDateLabel(viewDateKey)}.`
+                : `There are no ${categoryLabel.toLowerCase()} tasks in this checklist yet.`}</p>
+        `;
+        list.appendChild(empty);
     }
 
     renderTodoTemplateEditor(list);
@@ -2566,6 +3050,7 @@ window.addTodoTemplateItem = async function (category) {
 
     const items = state.todoTemplate.items.slice();
     const nextOrder = items.length ? Math.max(...items.map(item => Number(item.order) || 0)) + 1 : 1;
+    const currentDayIndex = getTodoWeekdayIndex();
     items.push({
         id: `${category}-${Date.now()}`,
         text: "New lovely task",
@@ -2573,6 +3058,47 @@ window.addTodoTemplateItem = async function (category) {
         category,
         encouragement: "Good job baby 💕 Im so proud of you, keep going youre doing amazing 💕",
         points: TODO_CATEGORY_CONFIG[category]?.defaultPoints || 10,
+        daysOfWeek: category === "daily" ? [currentDayIndex] : [],
+        activeDate: category === "temporary" ? getTodayDateKey() : "",
+        order: nextOrder,
+        active: true
+    });
+
+    await persistTodoTemplateUpdate({ ...state.todoTemplate, items });
+};
+
+window.addTodoTemplateItemFromForm = async function (category) {
+    if (!isNobody()) return;
+
+    const textInput = document.getElementById("todo-new-item-text");
+    const emojiInput = document.getElementById("todo-new-item-emoji");
+    const pointsInput = document.getElementById("todo-new-item-points");
+    const noteInput = document.getElementById("todo-new-item-note");
+    const text = textInput?.value?.trim() || "";
+
+    if (!text) {
+        showAlert("Write the task title first.");
+        textInput?.focus();
+        return;
+    }
+
+    const selectedDays = category === "daily" ? getSelectedTodoDraftDays() : [];
+    if (category === "daily" && !selectedDays.length) {
+        showAlert("Pick at least one day for the daily task.");
+        return;
+    }
+
+    const items = state.todoTemplate.items.slice();
+    const nextOrder = items.length ? Math.max(...items.map(item => Number(item.order) || 0)) + 1 : 1;
+    items.push({
+        id: `${category}-${Date.now()}`,
+        text,
+        emoji: emojiInput?.value?.trim() || "💕",
+        category,
+        encouragement: noteInput?.value?.trim() || DAILY_TODO_ENCOURAGEMENT_MESSAGE,
+        points: Math.max(1, Number(pointsInput?.value) || (TODO_CATEGORY_CONFIG[category]?.defaultPoints || 10)),
+        daysOfWeek: category === "daily" ? selectedDays : [],
+        activeDate: category === "temporary" ? getTodayDateKey() : "",
         order: nextOrder,
         active: true
     });
@@ -2595,7 +3121,69 @@ window.updateTodoTemplateItem = async function (itemId, field, value) {
 window.removeTodoTemplateItem = async function (itemId) {
     if (!isNobody()) return;
 
-    const items = state.todoTemplate.items.filter(item => item.id !== itemId);
+    const items = resequenceTodoTemplateItems(
+        state.todoTemplate.items
+            .filter(item => item.id !== itemId)
+            .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+    );
+    await persistTodoTemplateUpdate({ ...state.todoTemplate, items });
+};
+
+window.moveTodoTemplateItem = async function (itemId, direction) {
+    if (!isNobody()) return;
+
+    const targetItem = state.todoTemplate.items.find(item => item.id === itemId);
+    if (!targetItem) return;
+
+    const sortedItems = state.todoTemplate.items
+        .slice()
+        .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+    const category = getTodoCategory(targetItem);
+    const categoryIndexes = sortedItems.reduce((indexes, item, index) => {
+        if (getTodoCategory(item) === category) indexes.push(index);
+        return indexes;
+    }, []);
+
+    const currentIndex = categoryIndexes.findIndex(index => sortedItems[index].id === itemId);
+    if (currentIndex === -1) return;
+
+    const delta = direction === "up" ? -1 : 1;
+    const targetCategoryIndex = currentIndex + delta;
+    if (targetCategoryIndex < 0 || targetCategoryIndex >= categoryIndexes.length) return;
+
+    const fromIndex = categoryIndexes[currentIndex];
+    const toIndex = categoryIndexes[targetCategoryIndex];
+    [sortedItems[fromIndex], sortedItems[toIndex]] = [sortedItems[toIndex], sortedItems[fromIndex]];
+
+    const items = resequenceTodoTemplateItems(sortedItems);
+    await persistTodoTemplateUpdate({ ...state.todoTemplate, items });
+};
+
+window.toggleTodoTemplateItemDay = async function (itemId, dayIndex) {
+    if (!isNobody()) return;
+
+    let blocked = false;
+    const items = state.todoTemplate.items.map(item => {
+        if (item.id !== itemId || getTodoCategory(item) !== "daily") return item;
+
+        const currentDays = normalizeTodoDaysOfWeek(item);
+        const nextDays = currentDays.includes(dayIndex)
+            ? currentDays.filter(value => value !== dayIndex)
+            : [...currentDays, dayIndex].sort((a, b) => a - b);
+
+        if (!nextDays.length) {
+            blocked = true;
+            return item;
+        }
+
+        return { ...item, daysOfWeek: nextDays };
+    });
+
+    if (blocked) {
+        showAlert("A daily task needs at least one selected day.");
+        return;
+    }
+
     await persistTodoTemplateUpdate({ ...state.todoTemplate, items });
 };
 
@@ -2671,6 +3259,7 @@ window.toggleAttachmentMenu = function (event) {
 
 window.openTodoModal = async function () {
     await ensureCurrentTodoRecord();
+    state.activeTodoDateKey = getTodayDateKey();
     renderTodoModal();
     const modal = document.getElementById("todo-modal");
     if (modal) modal.style.display = "flex";
@@ -2687,6 +3276,7 @@ window.closeTodoModalOnOutsideClick = function (event) {
 
 window.toggleTodoItem = async function (itemId) {
     if (!isMyLove()) return;
+    if (!isTodoDateEditable(getTodoViewDateKey())) return;
 
     await ensureCurrentTodoRecord();
 
