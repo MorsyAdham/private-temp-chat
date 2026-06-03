@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -79,6 +79,15 @@
                                     <span class="header-tool-note">Find older messages fast</span>
                                 </span>
                             </button>
+                            <button id="load-all-menu-btn" type="button" class="header-tool-item" onclick="loadAllFromMenu()">
+                                <span class="header-tool-bubble">
+                                    <span class="material-icons">history</span>
+                                </span>
+                                <span class="header-tool-copy">
+                                    <span class="header-tool-label">Load All Messages</span>
+                                    <span class="header-tool-note" id="msg-count-note">Loading count…</span>
+                                </span>
+                            </button>
                             <div class="header-tool-item theme-picker-row">
                                 <label class="theme-picker-label" for="theme-select">
                                     <span class="header-tool-bubble">
@@ -92,6 +101,7 @@
                                 <select id="theme-select" class="theme-select" onchange="setThemeFromMenu(this.value)" aria-label="Choose theme">
                                     <option value="midnight-cute">Midnight Cute</option>
                                     <option value="cute">Cute</option>
+                                    <option value="ink">Ink (Dark)</option>
                                     <option value="classic">Classic</option>
                                 </select>
                             </div>
@@ -126,20 +136,24 @@
 
             <!-- Messages Container -->
             <div id="messages" class="messages-container">
-                <button id="load-more-btn" class="load-btn" onclick="loadOlderMessages()">
-                    <span class="material-icons">expand_less</span>
-                    Load older messages
-                </button>
-                <button id="load-all-btn" class="load-btn" onclick="loadAllMessages()">
-                    <span class="material-icons">history</span>
-                    Load all messages
-                </button>
+                <div id="load-more-spinner" class="load-more-spinner" style="display:none;">
+                    <span class="material-icons spin-icon">autorenew</span>
+                </div>
             </div>
 
             <!-- Jump to Bottom Button -->
             <button id="jump-bottom-btn" class="jump-bottom" onclick="scrollToBottom(true)" style="display: none;">
                 <span class="material-icons">arrow_downward</span>
             </button>
+
+            <!-- Typing Indicator -->
+            <div id="typing-indicator" class="typing-indicator" style="display: none;">
+                <div class="typing-bubble">
+                    <div class="typing-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            </div>
 
             <!-- Reply Preview -->
             <div id="reply-preview" class="reply-preview" style="display: none;">
@@ -173,6 +187,124 @@
                         <span id="attach-btn-icon" class="material-icons">add</span>
                     </button>
                 </div>
+                <!-- Baby Elephant Companion -->
+                <div id="chat-elephant" class="chat-elephant idle">
+                  <svg class="elephant-svg" viewBox="0 0 120 122" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                      <!-- Head: pale lavender, clear highlight -->
+                      <radialGradient id="eg-head" cx="36%" cy="28%" r="66%" gradientUnits="objectBoundingBox">
+                        <stop offset="0%"   stop-color="#f2e8ff"/>
+                        <stop offset="55%"  stop-color="#d4c4f0"/>
+                        <stop offset="100%" stop-color="#a898cc"/>
+                      </radialGradient>
+                      <!-- Body: slightly darker -->
+                      <radialGradient id="eg-body" cx="40%" cy="26%" r="70%" gradientUnits="objectBoundingBox">
+                        <stop offset="0%"   stop-color="#dccef8"/>
+                        <stop offset="100%" stop-color="#a090c0"/>
+                      </radialGradient>
+                      <!-- Ears -->
+                      <radialGradient id="eg-ear" cx="75%" cy="38%" r="72%" gradientUnits="objectBoundingBox">
+                        <stop offset="0%"   stop-color="#d2c2ec"/>
+                        <stop offset="100%" stop-color="#9888bc"/>
+                      </radialGradient>
+                    </defs>
+
+                    <ellipse class="el-shadow" cx="60" cy="119" rx="24" ry="4" fill="rgba(0,0,0,0.13)"/>
+
+                    <g class="el-char">
+
+                      <!-- LEFT EAR: large fan, sweeps far left, hangs below chin -->
+                      <g class="el-ear-l">
+                        <path d="M 36 22 C 14 18, 2 30, 2 52 C 2 66, 12 76, 28 72 C 30 64, 34 54, 34 34 Z"
+                              fill="url(#eg-ear)"/>
+                        <path d="M 34 28 C 16 24, 8 36, 8 52 C 8 62, 16 70, 28 66 C 30 60, 32 52, 32 36 Z"
+                              fill="#f8bcd8" opacity="0.9"/>
+                      </g>
+
+                      <!-- RIGHT EAR: mirror -->
+                      <g class="el-ear-r">
+                        <path d="M 84 22 C 106 18, 118 30, 118 52 C 118 66, 108 76, 92 72 C 90 64, 86 54, 86 34 Z"
+                              fill="url(#eg-ear)"/>
+                        <path d="M 86 28 C 104 24, 112 36, 112 52 C 112 62, 104 70, 92 66 C 90 60, 88 52, 88 36 Z"
+                              fill="#f8bcd8" opacity="0.9"/>
+                      </g>
+
+                      <!-- BODY: wide barrel -->
+                      <g class="el-body">
+                        <ellipse cx="60" cy="95" rx="26" ry="22" fill="url(#eg-body)"/>
+                        <ellipse cx="60" cy="92" rx="15" ry="12" fill="rgba(228,216,254,0.5)"/>
+                      </g>
+
+                      <!-- HEAD: large dome overlaps inner ears -->
+                      <circle cx="60" cy="42" r="28" fill="url(#eg-head)"/>
+                      <ellipse cx="49" cy="29" rx="10" ry="6.5" fill="rgba(255,255,255,0.22)" transform="rotate(-18 49 29)"/>
+
+                      <!-- Blush -->
+                      <ellipse cx="38" cy="52" rx="8.5" ry="5.5" fill="rgba(255,122,168,0.4)"/>
+                      <ellipse cx="82" cy="52" rx="8.5" ry="5.5" fill="rgba(255,122,168,0.4)"/>
+
+                      <!-- EYES: wide-set, lower on face for big-forehead baby look -->
+                      <g class="el-eyes">
+                        <circle cx="46" cy="45" r="7.5" fill="#170828"/>
+                        <circle cx="46" cy="45" r="5.5" fill="#2e1460"/>
+                        <circle cx="47.8" cy="43"   r="3"   fill="white"/>
+                        <circle cx="49"   cy="47.5" r="1.5" fill="rgba(255,255,255,0.4)"/>
+                        <circle cx="74" cy="45" r="7.5" fill="#170828"/>
+                        <circle cx="74" cy="45" r="5.5" fill="#2e1460"/>
+                        <circle cx="75.8" cy="43"   r="3"   fill="white"/>
+                        <circle cx="77"   cy="47.5" r="1.5" fill="rgba(255,255,255,0.4)"/>
+                      </g>
+
+                      <!-- Eyelids -->
+                      <g class="el-eyelids">
+                        <rect class="el-lid-l" x="38.5" y="37.5" width="15" height="15" rx="7.5" fill="#d4c4f0"/>
+                        <rect class="el-lid-r" x="66.5" y="37.5" width="15" height="15" rx="7.5" fill="#d4c4f0"/>
+                      </g>
+
+                      <!-- TRUNK: same lavender family, visibility from darker outline stroke -->
+                      <!-- No colour clash — just a subtle border gives definition -->
+                      <g class="el-trunk">
+                        <path d="M 60 70 Q 52 84 56 98"
+                              stroke="#8070b0" stroke-width="17" fill="none" stroke-linecap="round"/>
+                        <path d="M 60 70 Q 52 84 56 98"
+                              stroke="#ccbcec" stroke-width="11" fill="none" stroke-linecap="round"/>
+                        <path d="M 59 71 Q 51.5 84 55 97"
+                              stroke="rgba(238,230,255,0.65)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+                        <circle cx="56" cy="98" r="6.5" fill="#b0a0d0"/>
+                        <circle cx="56" cy="98" r="4"   fill="#ccbcec"/>
+                        <circle cx="53" cy="97"   r="1.9" fill="rgba(22,10,52,0.42)"/>
+                        <circle cx="59" cy="99.5" r="1.9" fill="rgba(22,10,52,0.42)"/>
+                      </g>
+
+                      <!-- LEGS + toenail dots -->
+                      <rect x="38" y="110" width="16" height="10" rx="8" fill="#b8a8d4"/>
+                      <rect x="66" y="110" width="16" height="10" rx="8" fill="#b8a8d4"/>
+                      <circle cx="42" cy="119" r="1.5" fill="rgba(255,255,255,0.55)"/>
+                      <circle cx="46" cy="120" r="1.5" fill="rgba(255,255,255,0.55)"/>
+                      <circle cx="50" cy="119" r="1.5" fill="rgba(255,255,255,0.55)"/>
+                      <circle cx="70" cy="119" r="1.5" fill="rgba(255,255,255,0.55)"/>
+                      <circle cx="74" cy="120" r="1.5" fill="rgba(255,255,255,0.55)"/>
+                      <circle cx="78" cy="119" r="1.5" fill="rgba(255,255,255,0.55)"/>
+
+                      <!-- TAIL -->
+                      <g class="el-tail">
+                        <path d="M 82 85 Q 93 80, 91 91 Q 89 98, 94 101"
+                              stroke="#b8a8d4" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                        <circle cx="94" cy="101" r="3.5" fill="#c4b4e0"/>
+                        <circle cx="91" cy="104" r="2.5" fill="#ccc0ec"/>
+                        <circle cx="97" cy="104" r="2.5" fill="#ccc0ec"/>
+                      </g>
+
+                    </g>
+
+                    <g class="el-stars">
+                      <text x="6"  y="24" font-size="14" font-family="sans-serif">&#x2728;</text>
+                      <text x="82" y="20" font-size="12" font-family="sans-serif">&#x2B50;</text>
+                      <text x="94" y="46" font-size="10" font-family="sans-serif">&#x2728;</text>
+                    </g>
+                  </svg>
+                </div>
+
                 <div class="composer-shell">
                     <textarea id="msg" placeholder="Type a message..." rows="1"></textarea>
                     <div id="composer-scrollbar" class="composer-scrollbar hidden" aria-hidden="true">

@@ -104,8 +104,12 @@ const THEMES = {
         emoji: "🌷",
         label: "Cute"
     },
-    classic: {
+    ink: {
         emoji: "🖤",
+        label: "Ink (Dark)"
+    },
+    classic: {
+        emoji: "💬",
         label: "Classic"
     }
 };
@@ -161,7 +165,10 @@ const state = {
     activeTodoDateKey: "",
     todoWeekRecords: {},
     headerToolsOpen: false,
-    todoReminderWatcher: null
+    todoReminderWatcher: null,
+    typingStopTimer: null,
+    peerTypingTimer: null,
+    isTypingActive: false
 };
 
 // ============================================================================
@@ -1287,6 +1294,7 @@ async function initializeChat() {
         setupReadReceiptListener();
         setupScrollHandler();
         updateConnectionStatus("connected");
+        updateMessageCountNote();
     } catch (error) {
         console.error("Chat initialization error:", error);
         updateConnectionStatus("disconnected");
@@ -1328,20 +1336,12 @@ window.reloadChat = async function () {
         const messagesDiv = document.getElementById("messages");
         messagesDiv.innerHTML = "";
 
-        const loadMoreBtn = document.createElement("button");
-        loadMoreBtn.id = "load-more-btn";
-        loadMoreBtn.className = "load-btn";
-        loadMoreBtn.onclick = loadOlderMessages;
-        loadMoreBtn.innerHTML = '<span class="material-icons">expand_less</span> Load older messages';
-
-        const loadAllBtn = document.createElement("button");
-        loadAllBtn.id = "load-all-btn";
-        loadAllBtn.className = "load-btn";
-        loadAllBtn.onclick = loadAllMessages;
-        loadAllBtn.innerHTML = '<span class="material-icons">history</span> Load all messages';
-
-        messagesDiv.appendChild(loadMoreBtn);
-        messagesDiv.appendChild(loadAllBtn);
+        const spinner = document.createElement("div");
+        spinner.id = "load-more-spinner";
+        spinner.className = "load-more-spinner";
+        spinner.style.display = "none";
+        spinner.innerHTML = '<span class="material-icons spin-icon">autorenew</span>';
+        messagesDiv.appendChild(spinner);
 
         state.oldestMessageTimestamp = null;
         state.hasMoreMessages = true;
@@ -1382,11 +1382,10 @@ async function loadAllMessagesFromDB() {
 }
 
 window.loadOlderMessages = async function () {
-    if (state.isLoadingOlderMessages || !state.hasMoreMessages) return;
-    myLoveNotify("loaded older messages ⬆️");
+    if (state.isLoadingOlderMessages || !state.hasMoreMessages || !state.oldestMessageTimestamp) return;
     state.isLoadingOlderMessages = true;
-    const loadBtn = document.getElementById("load-more-btn");
-    if (loadBtn) loadBtn.textContent = "Loading...";
+    const spinner = document.getElementById("load-more-spinner");
+    if (spinner) spinner.style.display = "flex";
 
     try {
         const { data, error } = await state.supabaseClient
@@ -1426,11 +1425,10 @@ window.loadOlderMessages = async function () {
 
 window.loadAllMessages = async function () {
     if (state.isLoadingOlderMessages) return;
-    const loadAllBtn = document.getElementById("load-all-btn");
-    const loadMoreBtn = document.getElementById("load-more-btn");
     state.isLoadingOlderMessages = true;
+    const spinner = document.getElementById("load-more-spinner");
+    if (spinner) spinner.style.display = "flex";
     myLoveNotify("loaded all messages 📜");
-    if (loadAllBtn) { loadAllBtn.textContent = "Loading all..."; loadAllBtn.disabled = true; }
 
     try {
         updateConnectionStatus("loading");
@@ -1445,32 +1443,58 @@ window.loadAllMessages = async function () {
         messagesDiv.querySelectorAll(".message-bubble, .date-separator").forEach(el => el.remove());
         state.allMessages.forEach(msg => renderMessage(msg, false));
         scrollToBottom(false);
-
-        if (loadMoreBtn) { loadMoreBtn.textContent = "All messages loaded"; loadMoreBtn.disabled = true; }
-        if (loadAllBtn) { loadAllBtn.textContent = "All messages loaded"; }
         updateConnectionStatus("connected");
+        updateMessageCountNote();
     } catch (error) {
         console.error("Load all failed:", error);
         showAlert("Failed to load all messages");
-        if (loadAllBtn) { loadAllBtn.textContent = "Load all messages"; loadAllBtn.disabled = false; }
     } finally {
         state.isLoadingOlderMessages = false;
+        if (spinner) spinner.style.display = "none";
     }
 };
 
 function updateLoadMoreButton() {
-    const loadBtn = document.getElementById("load-more-btn");
-    const loadAllBtn = document.getElementById("load-all-btn");
-    if (!loadBtn) return;
-    if (state.hasMoreMessages) {
-        loadBtn.innerHTML = '<span class="material-icons">expand_less</span> Load older messages';
-        loadBtn.disabled = false;
-        if (loadAllBtn) loadAllBtn.disabled = false;
+    const spinner = document.getElementById("load-more-spinner");
+    if (spinner) spinner.style.display = "none";
+    updateMessageCountNote();
+}
+
+function updateMessageCountNote() {
+    const note = document.getElementById("msg-count-note");
+    if (!note) return;
+    const loaded = state.allMessages.length;
+    if (!state.hasMoreMessages) {
+        note.textContent = `All ${loaded} messages loaded`;
     } else {
-        loadBtn.textContent = "No more messages";
-        loadBtn.disabled = true;
-        if (loadAllBtn) loadAllBtn.disabled = true;
+        note.textContent = `${loaded} loaded · tap to load all`;
     }
+}
+
+window.loadAllFromMenu = async function () {
+    setHeaderToolsOpen(false);
+    await loadAllMessages();
+    updateMessageCountNote();
+};
+
+function setupAutoLoadScroll() {
+    const messagesDiv = document.getElementById("messages");
+    if (!messagesDiv) return;
+    let debounce = null;
+    messagesDiv.addEventListener("scroll", () => {
+        // Guard: initial load not finished yet (timestamp is null during/after clear)
+        if (!state.oldestMessageTimestamp) return;
+        if (messagesDiv.scrollTop > 160 || !state.hasMoreMessages || state.isLoadingOlderMessages) return;
+        clearTimeout(debounce);
+        debounce = setTimeout(async () => {
+            if (!state.oldestMessageTimestamp) return;
+            if (messagesDiv.scrollTop <= 160 && state.hasMoreMessages && !state.isLoadingOlderMessages) {
+                const spinner = document.getElementById("load-more-spinner");
+                if (spinner) spinner.style.display = "flex";
+                await loadOlderMessages();
+            }
+        }, 250);
+    }, { passive: true });
 }
 
 function setupScrollHandler() {
@@ -1512,6 +1536,7 @@ async function setupRealtimeSubscription() {
         if (state.isAtBottom) scrollToBottom(true);
 
         if (message.sender !== state.currentUserEmail) {
+            hideTypingIndicator();
             if (state.isAtBottom) await markMessageAsRead(message.id);
 
             const preview =
@@ -1526,6 +1551,12 @@ async function setupRealtimeSubscription() {
 
     state.channel.on("broadcast", { event: "new-message" }, (p) => handleNewMessage(p.payload));
     state.channel.on("broadcast", { event: "reaction-updated" }, (p) => applyMessageUpdate(p.payload));
+    state.channel.on("broadcast", { event: "typing" }, (p) => {
+        if (p.payload?.sender !== state.currentUserEmail) showTypingIndicator();
+    });
+    state.channel.on("broadcast", { event: "typing-stop" }, (p) => {
+        if (p.payload?.sender !== state.currentUserEmail) hideTypingIndicator();
+    });
 
     state.channel.on("broadcast", { event: "image-viewed" }, (p) => {
         const { messageId, viewerId } = p.payload;
@@ -1797,6 +1828,8 @@ window.send = async function () {
         updateComposerScrollbar(textarea);
         cancelReply();
         updateSendVoiceToggle("");
+        broadcastTyping(false);
+        elephantOnSend();
 
     } catch (error) {
         console.error("Send error:", error);
@@ -1839,6 +1872,243 @@ function closeReactionPickers() {
     state.activeReactionPickerMessageId = null;
 }
 
+// ============================================================================
+// TYPING INDICATOR
+// ============================================================================
+
+function broadcastTyping(active) {
+    if (!state.channel) return;
+    clearTimeout(state.typingStopTimer);
+    if (active) {
+        if (!state.isTypingActive) {
+            state.isTypingActive = true;
+            state.channel.send({ type: "broadcast", event: "typing", payload: { sender: state.currentUserEmail } });
+        }
+        state.typingStopTimer = setTimeout(() => {
+            state.isTypingActive = false;
+            state.channel.send({ type: "broadcast", event: "typing-stop", payload: { sender: state.currentUserEmail } });
+        }, 3000);
+    } else {
+        if (state.isTypingActive) {
+            state.isTypingActive = false;
+            state.channel.send({ type: "broadcast", event: "typing-stop", payload: { sender: state.currentUserEmail } });
+        }
+    }
+}
+
+function showTypingIndicator() {
+    const el = document.getElementById("typing-indicator");
+    if (!el) return;
+    el.style.display = "block";
+    clearTimeout(state.peerTypingTimer);
+    state.peerTypingTimer = setTimeout(hideTypingIndicator, 6000);
+    if (state.isAtBottom) {
+        const messagesDiv = document.getElementById("messages");
+        if (messagesDiv) messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    elephantOnPeerTyping(true);
+}
+
+function hideTypingIndicator() {
+    clearTimeout(state.peerTypingTimer);
+    const el = document.getElementById("typing-indicator");
+    if (el) el.style.display = "none";
+    elephantOnPeerTyping(false);
+}
+
+// ============================================================================
+// BABY ELEPHANT COMPANION
+// ============================================================================
+
+let elephantCurrentState = "idle";
+let elephantThinkTimer = null;
+let elephantHappyTimer = null;
+
+function setElephantState(newState) {
+    const el = document.getElementById("chat-elephant");
+    if (!el || elephantCurrentState === newState) return;
+    el.classList.remove(elephantCurrentState);
+    el.classList.add(newState);
+    elephantCurrentState = newState;
+}
+
+function elephantOnTypingInput(hasText) {
+    clearTimeout(elephantThinkTimer);
+    if (elephantCurrentState === "happy") return;
+    if (hasText) {
+        setElephantState("typing");
+        elephantThinkTimer = setTimeout(() => {
+            if (elephantCurrentState === "typing") setElephantState("thinking");
+        }, 2200);
+    } else {
+        setElephantState("idle");
+    }
+}
+
+function elephantOnSend() {
+    clearTimeout(elephantThinkTimer);
+    clearTimeout(elephantHappyTimer);
+    setElephantState("happy");
+    elephantHappyTimer = setTimeout(() => setElephantState("idle"), 1900);
+}
+
+function elephantOnPeerTyping(active) {
+    if (elephantCurrentState === "happy" || elephantCurrentState === "typing" || elephantCurrentState === "thinking") return;
+    setElephantState(active ? "waiting" : "idle");
+}
+
+// ---- INTERACTIVE TAPS ----
+const ELEPHANT_FUN_STATES = ["surprised", "playful", "shy", "winking", "playful", "surprised"];
+let elephantFunIndex = 0;
+let elephantTapCount = 0;
+let elephantTapResetTimer = null;
+let elephantInteractionTimer = null;
+
+function elephantHandleTap() {
+    clearTimeout(elephantTapResetTimer);
+    clearTimeout(elephantInteractionTimer);
+    elephantTapCount++;
+
+    elephantTapResetTimer = setTimeout(() => {
+        const prevChatState = ["typing","thinking","waiting","happy"].includes(elephantCurrentState)
+            ? elephantCurrentState : "idle";
+
+        if (elephantTapCount >= 4) {
+            // Many rapid taps = angry
+            setElephantState("angry");
+            elephantInteractionTimer = setTimeout(() => setElephantState("idle"), 1800);
+        } else {
+            const next = ELEPHANT_FUN_STATES[elephantFunIndex % ELEPHANT_FUN_STATES.length];
+            elephantFunIndex++;
+            setElephantState(next);
+            const duration = next === "winking" ? 2200
+                           : next === "shy"     ? 2000
+                           : 1600;
+            elephantInteractionTimer = setTimeout(() => {
+                if (["surprised","playful","shy","winking","angry","tickled"].includes(elephantCurrentState)) {
+                    setElephantState(["typing","thinking","waiting"].includes(prevChatState) ? prevChatState : "idle");
+                }
+            }, duration);
+        }
+        elephantTapCount = 0;
+    }, 220);
+}
+
+function elephantHandleLongPress() {
+    clearTimeout(elephantTapResetTimer);
+    clearTimeout(elephantInteractionTimer);
+    elephantTapCount = 0;
+    setElephantState("tickled");
+    elephantInteractionTimer = setTimeout(() => {
+        setElephantState("happy");
+        elephantHappyTimer = setTimeout(() => setElephantState("idle"), 1800);
+    }, 1100);
+}
+
+function setupElephantInteraction() {
+    const el = document.getElementById("chat-elephant");
+    if (!el) return;
+    let lpTimer = null;
+    let startX = 0, startY = 0;
+
+    el.addEventListener("pointerdown", (e) => {
+        startX = e.clientX; startY = e.clientY;
+        lpTimer = setTimeout(() => { lpTimer = null; elephantHandleLongPress(); }, 420);
+    });
+    el.addEventListener("pointermove", (e) => {
+        if (!lpTimer) return;
+        if (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8) {
+            clearTimeout(lpTimer); lpTimer = null;
+        }
+    });
+    ["pointerup","pointercancel"].forEach(ev => {
+        el.addEventListener(ev, () => {
+            if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; elephantHandleTap(); }
+        });
+    });
+}
+
+// ============================================================================
+// MESSAGE CONTEXT MENU
+// ============================================================================
+
+let activeContextMenu = null;
+
+function openMessageContextMenu(messageId, anchor) {
+    closeMessageContextMenu();
+    const message = state.allMessages.find(m => m.id === messageId);
+    if (!message) return;
+
+    const bubble = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (bubble) bubble.classList.add("menu-open");
+
+    const menu = document.createElement("div");
+    menu.className = "msg-context-menu";
+
+    const reactBtn = document.createElement("button");
+    reactBtn.className = "msg-context-option";
+    reactBtn.innerHTML = '<span class="material-icons">add_reaction</span>React';
+    reactBtn.onclick = (e) => {
+        e.stopPropagation();
+        closeMessageContextMenu();
+        openReactionPicker(messageId);
+    };
+    menu.appendChild(reactBtn);
+
+    const messageType = message.message_type || "text";
+    if (messageType === "text" && message.text) {
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "msg-context-option";
+        copyBtn.innerHTML = '<span class="material-icons">content_copy</span>Copy';
+        copyBtn.onclick = (e) => {
+            e.stopPropagation();
+            closeMessageContextMenu();
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(message.text).catch(() => fallbackCopy(message.text));
+            } else {
+                fallbackCopy(message.text);
+            }
+        };
+        menu.appendChild(copyBtn);
+    }
+
+    document.body.appendChild(menu);
+    activeContextMenu = { menu, messageId };
+
+    requestAnimationFrame(() => {
+        const anchorRect = anchor.getBoundingClientRect();
+        const menuW = menu.offsetWidth || 160;
+        const menuH = menu.offsetHeight || 90;
+        let left = anchorRect.left - menuW / 2 + anchorRect.width / 2;
+        let top = anchorRect.top - menuH - 8;
+        left = Math.max(8, Math.min(left, window.innerWidth - menuW - 8));
+        top = top < 8 ? anchorRect.bottom + 8 : top;
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+    });
+}
+
+function closeMessageContextMenu() {
+    if (!activeContextMenu) return;
+    const { menu, messageId } = activeContextMenu;
+    menu.remove();
+    const bubble = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (bubble) bubble.classList.remove("menu-open");
+    activeContextMenu = null;
+}
+
+function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand("copy"); } catch (_) {}
+    document.body.removeChild(ta);
+}
+
 function positionReactionPicker(picker, bubble, isSender) {
     const rect = bubble.getBoundingClientRect();
     const pickerWidth = picker.offsetWidth || 280;
@@ -1860,6 +2130,7 @@ function addLongPressReaction(bubble, messageId) {
     let timer = null;
     let startX = 0;
     let startY = 0;
+    let lastTapTime = 0;
     const shouldIgnore = (target) => !!target?.closest("input, button, textarea, audio, video, a, .voice-waveform, .voice-message, .message-reactions");
 
     const clearTimer = () => {
@@ -1869,10 +2140,23 @@ function addLongPressReaction(bubble, messageId) {
         }
     };
 
+    bubble.addEventListener("contextmenu", (e) => e.preventDefault());
+
     bubble.addEventListener("pointerdown", (event) => {
         if (shouldIgnore(event.target) || event.pointerType === "mouse") return;
+        const now = Date.now();
         startX = event.clientX;
         startY = event.clientY;
+
+        if (now - lastTapTime < 300) {
+            // Double tap → heart reaction
+            clearTimer();
+            lastTapTime = 0;
+            toggleMessageReaction(messageId, "❤️");
+            return;
+        }
+        lastTapTime = now;
+
         timer = setTimeout(() => {
             openReactionPicker(messageId);
             clearTimer();
@@ -1927,10 +2211,31 @@ function renderMessageReactionBar(bubble, message) {
 }
 
 function renderSystemMessageContent(bubble, message) {
-    const textDiv = document.createElement("div");
-    textDiv.className = "system-message-text";
-    textDiv.textContent = message.text || "";
-    bubble.appendChild(textDiv);
+    const text = message.text || "";
+
+    if (text.startsWith("✓ ")) {
+        // Todo encouragement message — split into task line + cute message
+        const newlineIdx = text.indexOf("\n");
+        const taskLine = newlineIdx > -1 ? text.slice(0, newlineIdx) : text;
+        const encouragementLine = newlineIdx > -1 ? text.slice(newlineIdx + 1).trim() : "";
+
+        const taskEl = document.createElement("div");
+        taskEl.className = "system-todo-task";
+        taskEl.textContent = taskLine;
+        bubble.appendChild(taskEl);
+
+        if (encouragementLine) {
+            const msgEl = document.createElement("div");
+            msgEl.className = "system-todo-encouragement";
+            msgEl.textContent = encouragementLine;
+            bubble.appendChild(msgEl);
+        }
+    } else {
+        const textDiv = document.createElement("div");
+        textDiv.className = "system-message-text";
+        textDiv.textContent = text;
+        bubble.appendChild(textDiv);
+    }
 }
 
 function getReactionMessagePreview(message) {
@@ -2138,6 +2443,16 @@ function renderMessage(message, prepend = false) {
         replyBtn.innerHTML = '<span class="material-icons">reply</span>';
         replyBtn.onclick = (e) => { e.stopPropagation(); setReply(message.id); };
         bubble.appendChild(replyBtn);
+
+        // Three-dot options button
+        const menuBtn = document.createElement("button");
+        menuBtn.className = "msg-menu-btn";
+        menuBtn.type = "button";
+        menuBtn.title = "Options";
+        menuBtn.textContent = "⋮";
+        menuBtn.onclick = (e) => { e.stopPropagation(); openMessageContextMenu(message.id, menuBtn); };
+        bubble.appendChild(menuBtn);
+
         addLongPressReaction(bubble, message.id);
 
         // Swipe-to-reply (mobile)
@@ -3188,13 +3503,15 @@ window.toggleTodoTemplateItemDay = async function (itemId, dayIndex) {
 };
 
 async function announceTodoEncouragement(templateItem, metrics) {
-    const categoryLabel = TODO_CATEGORY_CONFIG[getTodoCategory(templateItem)].label;
-    const text = `💕 ${templateItem?.emoji || "💕"} ${templateItem?.text || "A task"} finished\n${getTodoItemEncouragement(templateItem)}\n+${getTodoItemPoints(templateItem)} pts · ${categoryLabel}\nStreak: ${Math.max(state.loveStreak, 1)} day${Math.max(state.loveStreak, 1) === 1 ? "" : "s"} · Total: ${state.totalLoveScore}`;
+    const emoji = templateItem?.emoji || "💕";
+    const taskText = templateItem?.text || "A task";
+    const encouragement = getTodoItemEncouragement(templateItem);
+    const text = `✓ ${emoji} ${taskText}\n${encouragement}`;
 
     try {
         await sendSystemMessage(text, {
             notifyTelegram: true,
-            telegramText: `💕 My Love finished: ${templateItem?.text || "A task"}\n${getTodoItemEncouragement(templateItem)}\n+${getTodoItemPoints(templateItem)} pts · ${categoryLabel}\nStreak: ${Math.max(state.loveStreak, 1)} day${Math.max(state.loveStreak, 1) === 1 ? "" : "s"} · Total: ${state.totalLoveScore}`
+            telegramText: `💕 My Love finished: ${taskText}\n${encouragement}`
         });
     } catch (error) {
         console.error("System encouragement message error:", error);
@@ -3998,6 +4315,8 @@ document.addEventListener("DOMContentLoaded", () => {
     applyTheme(getStoredTheme());
     applyAppViewLayout(getStoredAppViewPreference());
     syncViewportLayout();
+    setupElephantInteraction();
+    setupAutoLoadScroll();
 
     const msgTextarea = document.getElementById("msg");
 
@@ -4013,6 +4332,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const ta = e.target;
             autoResizeTextarea(ta);
             updateSendVoiceToggle(ta.value);
+            broadcastTyping(ta.value.trim().length > 0);
+            elephantOnTypingInput(ta.value.trim().length > 0);
 
             const text = ta.value;
             if (text.trim().length > 0) {
@@ -4094,6 +4415,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (!event.target.closest(".reaction-picker, .reaction-chip")) {
             closeReactionPickers();
+        }
+        if (!event.target.closest(".msg-context-menu, .msg-menu-btn")) {
+            closeMessageContextMenu();
         }
     });
 });
