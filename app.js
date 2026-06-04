@@ -1329,6 +1329,12 @@ async function loadInitialMessages() {
 }
 
 window.reloadChat = async function () {
+    // Hide jump-mode banner if active
+    const jb = document.getElementById("jump-banner");
+    if (jb) jb.style.display = "none";
+    const ji = document.getElementById("jump-date-input");
+    if (ji) ji.value = "";
+
     updateConnectionStatus("loading");
     try {
         if (state.channel) { await state.channel.unsubscribe(); state.channel = null; }
@@ -1362,24 +1368,68 @@ window.reloadChat = async function () {
 // PART 2 — PAGINATION
 // ============================================================================
 
-async function loadAllMessagesFromDB() {
-    const PAGE_SIZE = 1000;
-    let all = [];
-    let from = 0;
-    while (true) {
+// Jump to a specific date — loads ALL messages on that day, then scroll-up loads older
+window.jumpToDateFromMenu = async function (dateString) {
+    if (!dateString || !state.supabaseClient) return;
+    setHeaderToolsOpen(false);
+
+    const dayStart = new Date(dateString + "T00:00:00").toISOString();
+    const dayEnd   = new Date(dateString + "T23:59:59.999").toISOString();
+    const dateLabel = new Date(dateString + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "short", month: "short", day: "numeric", year: "numeric"
+    });
+
+    updateConnectionStatus("loading");
+    try {
         const { data, error } = await state.supabaseClient
             .from("chat_messages")
             .select("*")
-            .order("created_at", { ascending: true })
-            .range(from, from + PAGE_SIZE - 1);
+            .gte("created_at", dayStart)
+            .lte("created_at", dayEnd)
+            .order("created_at", { ascending: true });
         if (error) throw error;
-        if (!data || data.length === 0) break;
-        all = all.concat(data);
-        if (data.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
+
+        const messages = filterVisibleMessages(data || []);
+        if (!messages.length) {
+            showAlert(`No messages found on ${dateLabel}. Try a different date.`);
+            updateConnectionStatus("connected");
+            // Reset the date input so user can pick again
+            const input = document.getElementById("jump-date-input");
+            if (input) input.value = "";
+            return;
+        }
+
+        state.allMessages = messages;
+        state.oldestMessageTimestamp = messages[0].created_at;
+        state.hasMoreMessages = true;
+
+        const messagesDiv = document.getElementById("messages");
+        messagesDiv.querySelectorAll(".message-bubble, .date-separator").forEach(el => el.remove());
+        state.allMessages.forEach(msg => renderMessage(msg, false));
+        messagesDiv.scrollTop = 0;
+
+        // Show the jump-mode banner
+        const banner = document.getElementById("jump-banner");
+        const bannerLabel = document.getElementById("jump-banner-label");
+        if (banner) banner.style.display = "flex";
+        if (bannerLabel) bannerLabel.textContent = dateLabel;
+
+        updateConnectionStatus("connected");
+        updateMessageCountNote();
+    } catch (err) {
+        console.error("Jump to date failed:", err);
+        showAlert("Failed to load messages for that date.");
+        updateConnectionStatus("connected");
     }
-    return filterVisibleMessages(all);
-}
+};
+
+window.exitJumpMode = function () {
+    const banner = document.getElementById("jump-banner");
+    if (banner) banner.style.display = "none";
+    const input = document.getElementById("jump-date-input");
+    if (input) input.value = "";
+    reloadChat();
+};
 
 window.loadOlderMessages = async function () {
     if (state.isLoadingOlderMessages || !state.hasMoreMessages || !state.oldestMessageTimestamp) return;
@@ -1399,60 +1449,63 @@ window.loadOlderMessages = async function () {
         if (!data || data.length === 0) { state.hasMoreMessages = false; updateLoadMoreButton(); return; }
 
         const messagesDiv = document.getElementById("messages");
-        const oldScrollHeight = messagesDiv.scrollHeight;
-
-        const newMessages = filterVisibleMessages(data).reverse();
+        const newMessages = filterVisibleMessages(data).reverse(); // oldest first
         const trulyNew = newMessages.filter(m => !state.allMessages.some(e => e.id === m.id));
         if (!trulyNew.length) { updateLoadMoreButton(); return; }
 
         state.oldestMessageTimestamp = trulyNew[0].created_at;
         state.allMessages = sortMessagesByTime([...trulyNew, ...state.allMessages]);
 
-        // Full re-render to ensure correct date separators
-        messagesDiv.querySelectorAll(".message-bubble, .date-separator").forEach(el => el.remove());
-        state.allMessages.forEach(msg => renderMessage(msg, false));
+        // Efficient prepend: build into a DocumentFragment, no full re-render
+        const frag = document.createDocumentFragment();
+        let lastFragDate = null;
+        trulyNew.forEach(msg => {
+            const dateLabel = getDateLabel(msg.created_at);
+            if (dateLabel !== lastFragDate) {
+                const sep = document.createElement("div");
+                sep.className = "date-separator";
+                sep.dataset.date = dateLabel;
+                const span = document.createElement("span");
+                span.textContent = dateLabel;
+                sep.appendChild(span);
+                frag.appendChild(sep);
+                lastFragDate = dateLabel;
+            }
+            renderMessage(msg, false, frag); // render into fragment
+        });
+
+        // Remove first existing separator if it matches the last date in the new batch
+        // (prevents duplicate date headers at the seam)
+        const firstExistingSep = messagesDiv.querySelector(".date-separator");
+        if (firstExistingSep && firstExistingSep.dataset.date === lastFragDate) {
+            firstExistingSep.remove();
+        }
+
+        // Record scroll height before insert so user stays at same visual position
+        const oldScrollHeight = messagesDiv.scrollHeight;
+
+        // Insert fragment right after the spinner (before first existing message)
+        const spinnerEl = document.getElementById("load-more-spinner");
+        const insertBefore = spinnerEl ? spinnerEl.nextSibling : messagesDiv.firstChild;
+        if (insertBefore) messagesDiv.insertBefore(frag, insertBefore);
+        else messagesDiv.appendChild(frag);
 
         messagesDiv.scrollTop = messagesDiv.scrollHeight - oldScrollHeight;
         state.hasMoreMessages = data.length === CONFIG.pagination.pageSize;
         updateLoadMoreButton();
+        updateMessageCountNote();
     } catch (error) {
         console.error("Load older failed:", error);
         showAlert("Failed to load older messages");
     } finally {
         state.isLoadingOlderMessages = false;
-    }
-};
-
-window.loadAllMessages = async function () {
-    if (state.isLoadingOlderMessages) return;
-    state.isLoadingOlderMessages = true;
-    const spinner = document.getElementById("load-more-spinner");
-    if (spinner) spinner.style.display = "flex";
-    myLoveNotify("loaded all messages 📜");
-
-    try {
-        updateConnectionStatus("loading");
-        const all = await loadAllMessagesFromDB();
-        if (!all || !all.length) return;
-
-        state.allMessages = all;
-        state.oldestMessageTimestamp = all[0].created_at;
-        state.hasMoreMessages = false;
-
-        const messagesDiv = document.getElementById("messages");
-        messagesDiv.querySelectorAll(".message-bubble, .date-separator").forEach(el => el.remove());
-        state.allMessages.forEach(msg => renderMessage(msg, false));
-        scrollToBottom(false);
-        updateConnectionStatus("connected");
-        updateMessageCountNote();
-    } catch (error) {
-        console.error("Load all failed:", error);
-        showAlert("Failed to load all messages");
-    } finally {
-        state.isLoadingOlderMessages = false;
         if (spinner) spinner.style.display = "none";
     }
 };
+
+// loadAllMessages removed — replaced by jumpToDateFromMenu for performance.
+// With 90k+ messages, loading everything at once freezes the browser.
+// Use "Jump to Date" in the header menu instead.
 
 function updateLoadMoreButton() {
     const spinner = document.getElementById("load-more-spinner");
@@ -1471,11 +1524,7 @@ function updateMessageCountNote() {
     }
 }
 
-window.loadAllFromMenu = async function () {
-    setHeaderToolsOpen(false);
-    await loadAllMessages();
-    updateMessageCountNote();
-};
+// loadAllFromMenu removed — use jumpToDateFromMenu instead.
 
 function setupAutoLoadScroll() {
     const messagesDiv = document.getElementById("messages");
@@ -2351,27 +2400,30 @@ function applyMessageUpdate(message) {
     if (message.read !== undefined) updateMessageReadReceipt(message.id, message.read);
 }
 
-function renderMessage(message, prepend = false) {
-    const messagesDiv = document.getElementById("messages");
+// containerEl: when set, render into that element (fragment) — skips date sep + dupe check
+function renderMessage(message, prepend = false, containerEl = null) {
+    const messagesDiv = containerEl || document.getElementById("messages");
     const isSender = message.sender === state.currentUserEmail;
     const messageType = message.message_type || "text";
     const isSystem = isSystemMessage(message);
 
-    // Skip duplicates
-    if (document.querySelector(`[data-message-id="${message.id}"]`)) return;
+    // Skip duplicates only when rendering into live DOM
+    if (!containerEl && document.querySelector(`[data-message-id="${message.id}"]`)) return;
 
-    // --- Date separator ---
-    const dateLabel = getDateLabel(message.created_at);
-    if (!prepend) {
-        const lastDate = getLastRenderedDateLabel();
-        if (lastDate !== dateLabel) {
-            const sep = document.createElement("div");
-            sep.className = "date-separator";
-            sep.dataset.date = dateLabel;
-            const span = document.createElement("span");
-            span.textContent = dateLabel;
-            sep.appendChild(span);
-            messagesDiv.appendChild(sep);
+    // Date separator — only when rendering into live DOM (caller handles it for fragments)
+    if (!containerEl) {
+        const dateLabel = getDateLabel(message.created_at);
+        if (!prepend) {
+            const lastDate = getLastRenderedDateLabel();
+            if (lastDate !== dateLabel) {
+                const sep = document.createElement("div");
+                sep.className = "date-separator";
+                sep.dataset.date = dateLabel;
+                const span = document.createElement("span");
+                span.textContent = dateLabel;
+                sep.appendChild(span);
+                messagesDiv.appendChild(sep);
+            }
         }
     }
 
@@ -2459,8 +2511,8 @@ function renderMessage(message, prepend = false) {
         addSwipeToReply(bubble, message.id);
     }
 
-    // Insert into DOM
-    if (prepend) {
+    // Insert into DOM / container
+    if (!containerEl && prepend) {
         const first = messagesDiv.querySelector(".message-bubble");
         if (first) messagesDiv.insertBefore(bubble, first);
         else messagesDiv.appendChild(bubble);
@@ -2470,7 +2522,7 @@ function renderMessage(message, prepend = false) {
 
     renderMessageReactionBar(bubble, message);
 
-    if (!isSender && !message.read) state.unreadMessages.add(message.id);
+    if (!containerEl && !isSender && !message.read) state.unreadMessages.add(message.id);
 }
 
 // --- Text with link detection + URL preview card ---
@@ -4306,6 +4358,48 @@ function injectDynamicStyles() {
 }
 
 // ============================================================================
+// ADD TO HOME SCREEN
+// ============================================================================
+
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    // Update button note to signal it's ready to install
+    const note = document.getElementById("add-home-note");
+    if (note) note.textContent = "Tap to install instantly";
+    const icon = document.getElementById("add-home-icon");
+    if (icon) icon.textContent = "download";
+});
+
+window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    const note = document.getElementById("add-home-note");
+    if (note) note.textContent = "App installed ✓";
+    const icon = document.getElementById("add-home-icon");
+    if (icon) icon.textContent = "check_circle";
+});
+
+window.addToHomeScreen = function () {
+    setHeaderToolsOpen(false);
+    if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.then(result => {
+            if (result.outcome === "accepted") deferredInstallPrompt = null;
+        });
+    } else {
+        document.getElementById("add-to-home-modal").style.display = "flex";
+    }
+};
+
+window.closeAddToHomeModal = function (e) {
+    if (!e || e.target === document.getElementById("add-to-home-modal")) {
+        document.getElementById("add-to-home-modal").style.display = "none";
+    }
+};
+
+// ============================================================================
 // PART 3 — EVENT LISTENERS
 // ============================================================================
 
@@ -4364,7 +4458,8 @@ document.addEventListener("DOMContentLoaded", () => {
             { id: "video-preview-modal", fn: cancelVideoSend },
             { id: "attachment-menu", fn: closeAttachmentMenu },
             { id: "todo-modal", fn: closeTodoModal },
-            { id: "search-bar", fn: closeSearch }
+            { id: "search-bar", fn: closeSearch },
+            { id: "add-to-home-modal", fn: () => closeAddToHomeModal() }
         ];
 
         for (const { id, fn } of checks) {

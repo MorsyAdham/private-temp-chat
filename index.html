@@ -4,34 +4,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Private Chat Room</title>
+    <title>Just the Two of Us &#x1F495;</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <!-- Inline favicon, no external file needed -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff82b7">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Our Room">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <!-- Inline favicon -->
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💕</text></svg>">
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
+            });
+        }
+    </script>
 </head>
 
 <body>
     <div class="wrapper">
         <!-- LOGIN SCREEN -->
-        <div id="login" class="container">
-            <div class="login-header">
-                <h2>💕 Just the Two of Us 💕</h2>
-                <p>Sign in to continue</p>
+        <div id="login" class="container login-page">
+          <div class="login-card">
+
+            <!-- Elephant + floating hearts -->
+            <div class="login-elephant-wrap">
+                <div class="login-hearts">
+                    <span class="login-heart">&#x1F495;</span>
+                    <span class="login-heart">&#x1FA77;</span>
+                    <span class="login-heart">&#x1F495;</span>
+                    <span class="login-heart">&#x2764;&#xFE0F;</span>
+                    <span class="login-heart">&#x1FA77;</span>
+                </div>
+                <div class="chat-elephant login-wave login-size">
+                  <svg class="elephant-svg" viewBox="0 0 120 122" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                      <radialGradient id="lg-head" cx="36%" cy="28%" r="66%" gradientUnits="objectBoundingBox">
+                        <stop offset="0%"   stop-color="#f2e8ff"/>
+                        <stop offset="55%"  stop-color="#d4c4f0"/>
+                        <stop offset="100%" stop-color="#a898cc"/>
+                      </radialGradient>
+                      <radialGradient id="lg-body" cx="40%" cy="26%" r="70%" gradientUnits="objectBoundingBox">
+                        <stop offset="0%"   stop-color="#dccef8"/>
+                        <stop offset="100%" stop-color="#a090c0"/>
+                      </radialGradient>
+                      <radialGradient id="lg-ear" cx="75%" cy="38%" r="72%" gradientUnits="objectBoundingBox">
+                        <stop offset="0%"   stop-color="#d2c2ec"/>
+                        <stop offset="100%" stop-color="#9888bc"/>
+                      </radialGradient>
+                    </defs>
+                    <ellipse class="el-shadow" cx="60" cy="119" rx="24" ry="4" fill="rgba(0,0,0,0.13)"/>
+                    <g class="el-char">
+                      <g class="el-ear-l">
+                        <path d="M 36 22 C 14 18, 2 30, 2 52 C 2 66, 12 76, 28 72 C 30 64, 34 54, 34 34 Z" fill="url(#lg-ear)"/>
+                        <path d="M 34 28 C 16 24, 8 36, 8 52 C 8 62, 16 70, 28 66 C 30 60, 32 52, 32 36 Z" fill="#f8bcd8" opacity="0.9"/>
+                      </g>
+                      <g class="el-ear-r">
+                        <path d="M 84 22 C 106 18, 118 30, 118 52 C 118 66, 108 76, 92 72 C 90 64, 86 54, 86 34 Z" fill="url(#lg-ear)"/>
+                        <path d="M 86 28 C 104 24, 112 36, 112 52 C 112 62, 104 70, 92 66 C 90 60, 88 52, 88 36 Z" fill="#f8bcd8" opacity="0.9"/>
+                      </g>
+                      <g class="el-body">
+                        <ellipse cx="60" cy="95" rx="26" ry="22" fill="url(#lg-body)"/>
+                        <ellipse cx="60" cy="92" rx="15" ry="12" fill="rgba(228,216,254,0.5)"/>
+                      </g>
+                      <circle cx="60" cy="42" r="28" fill="url(#lg-head)"/>
+                      <ellipse cx="49" cy="29" rx="10" ry="6.5" fill="rgba(255,255,255,0.22)" transform="rotate(-18 49 29)"/>
+                      <ellipse cx="38" cy="52" rx="8.5" ry="5.5" fill="rgba(255,122,168,0.4)"/>
+                      <ellipse cx="82" cy="52" rx="8.5" ry="5.5" fill="rgba(255,122,168,0.4)"/>
+                      <g class="el-eyes">
+                        <circle cx="46" cy="45" r="7.5" fill="#170828"/>
+                        <circle cx="46" cy="45" r="5.5" fill="#2e1460"/>
+                        <circle cx="47.8" cy="43"   r="3"   fill="white"/>
+                        <circle cx="49"   cy="47.5" r="1.5" fill="rgba(255,255,255,0.4)"/>
+                        <circle cx="74" cy="45" r="7.5" fill="#170828"/>
+                        <circle cx="74" cy="45" r="5.5" fill="#2e1460"/>
+                        <circle cx="75.8" cy="43"   r="3"   fill="white"/>
+                        <circle cx="77"   cy="47.5" r="1.5" fill="rgba(255,255,255,0.4)"/>
+                      </g>
+                      <g class="el-eyelids">
+                        <rect class="el-lid-l" x="38.5" y="37.5" width="15" height="15" rx="7.5" fill="#d4c4f0"/>
+                        <rect class="el-lid-r" x="66.5" y="37.5" width="15" height="15" rx="7.5" fill="#d4c4f0"/>
+                      </g>
+                      <g class="el-trunk">
+                        <path d="M 60 70 Q 52 84 56 98" stroke="#8070b0" stroke-width="17" fill="none" stroke-linecap="round"/>
+                        <path d="M 60 70 Q 52 84 56 98" stroke="#ccbcec" stroke-width="11" fill="none" stroke-linecap="round"/>
+                        <path d="M 59 71 Q 51.5 84 55 97" stroke="rgba(238,230,255,0.65)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+                        <circle cx="56" cy="98" r="6.5" fill="#b0a0d0"/>
+                        <circle cx="56" cy="98" r="4"   fill="#ccbcec"/>
+                        <circle cx="53" cy="97"   r="1.9" fill="rgba(22,10,52,0.42)"/>
+                        <circle cx="59" cy="99.5" r="1.9" fill="rgba(22,10,52,0.42)"/>
+                      </g>
+                      <rect x="38" y="110" width="16" height="10" rx="8" fill="#b8a8d4"/>
+                      <rect x="66" y="110" width="16" height="10" rx="8" fill="#b8a8d4"/>
+                      <g class="el-tail">
+                        <path d="M 82 85 Q 93 80, 91 91 Q 89 98, 94 101" stroke="#b8a8d4" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                        <circle cx="94" cy="101" r="3.5" fill="#c4b4e0"/>
+                        <circle cx="91" cy="104" r="2.5" fill="#ccc0ec"/>
+                        <circle cx="97" cy="104" r="2.5" fill="#ccc0ec"/>
+                      </g>
+                    </g>
+                  </svg>
+                </div>
             </div>
-            <form onsubmit="event.preventDefault(); login()">
-                <input type="email" id="email" placeholder="Email" autocomplete="email">
-                <input type="password" id="password" placeholder="Password" autocomplete="current-password">
-                <button type="submit" class="btn-primary">Login</button>
+
+            <!-- Title -->
+            <div class="login-title-wrap">
+                <h1 class="login-title">Just the Two of Us</h1>
+                <p class="login-subtitle">&#x1F495; Our private little world &#x1F495;</p>
+            </div>
+
+            <!-- Form -->
+            <form class="login-form" onsubmit="event.preventDefault(); login()">
+                <div class="login-field">
+                    <span class="material-icons login-field-icon">mail_outline</span>
+                    <input type="email" id="email" name="email" placeholder="Email" autocomplete="email">
+                </div>
+                <div class="login-field">
+                    <span class="material-icons login-field-icon">lock_outline</span>
+                    <input type="password" id="password" name="password" placeholder="Password" autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-login">
+                    <span class="material-icons">favorite</span>
+                    Sign in
+                </button>
             </form>
+
+        </div>
         </div>
 
         <!-- CHAT SCREEN -->
@@ -61,7 +171,9 @@
                             <span class="material-icons">tune</span>
                         </button>
                         <div id="header-tools-menu" class="header-tools-menu" style="display: none;">
-                            <button id="app-view-btn" type="button" class="header-tool-item" onclick="toggleAppViewFromMenu()" title="Toggle full screen">
+
+                            <!-- Actions -->
+                            <button id="app-view-btn" type="button" class="header-tool-item" onclick="toggleAppViewFromMenu()">
                                 <span class="header-tool-bubble">
                                     <span id="app-view-icon" class="material-icons">smartphone</span>
                                 </span>
@@ -70,41 +182,63 @@
                                     <span class="header-tool-note">Expanded mobile-style layout</span>
                                 </span>
                             </button>
+
                             <button type="button" class="header-tool-item" onclick="toggleSearchFromMenu()">
                                 <span class="header-tool-bubble">
                                     <span class="material-icons">search</span>
                                 </span>
                                 <span class="header-tool-copy">
-                                    <span class="header-tool-label">Search</span>
+                                    <span class="header-tool-label">Search Messages</span>
                                     <span class="header-tool-note">Find older messages fast</span>
                                 </span>
                             </button>
-                            <button id="load-all-menu-btn" type="button" class="header-tool-item" onclick="loadAllFromMenu()">
+
+                            <button id="add-to-home-btn" type="button" class="header-tool-item" onclick="addToHomeScreen()">
                                 <span class="header-tool-bubble">
-                                    <span class="material-icons">history</span>
+                                    <span id="add-home-icon" class="material-icons">add_to_home_screen</span>
                                 </span>
                                 <span class="header-tool-copy">
-                                    <span class="header-tool-label">Load All Messages</span>
-                                    <span class="header-tool-note" id="msg-count-note">Loading count…</span>
+                                    <span class="header-tool-label">Add to Home Screen</span>
+                                    <span id="add-home-note" class="header-tool-note">Install as an app on your phone</span>
                                 </span>
                             </button>
-                            <div class="header-tool-item theme-picker-row">
-                                <label class="theme-picker-label" for="theme-select">
+
+                            <div class="header-tool-divider"></div>
+
+                            <!-- Settings (stacked: label row + full-width control) -->
+                            <div class="header-tool-item header-tool-item--stacked">
+                                <div class="header-tool-row">
                                     <span class="header-tool-bubble">
-                                        <span id="theme-toggle-emoji" class="theme-toggle-emoji">💕</span>
+                                        <span class="material-icons">calendar_today</span>
+                                    </span>
+                                    <span class="header-tool-copy">
+                                        <span class="header-tool-label">Jump to Date</span>
+                                        <span class="header-tool-note" id="msg-count-note">Scroll up loads older messages</span>
+                                    </span>
+                                </div>
+                                <input type="date" id="jump-date-input" class="jump-date-input tool-control-full"
+                                       onchange="jumpToDateFromMenu(this.value)" title="Pick a date">
+                            </div>
+
+                            <div class="header-tool-item header-tool-item--stacked">
+                                <div class="header-tool-row">
+                                    <span class="header-tool-bubble">
+                                        <span id="theme-toggle-emoji" class="theme-toggle-emoji">&#x1F495;</span>
                                     </span>
                                     <span class="header-tool-copy">
                                         <span id="theme-toggle-label" class="header-tool-label">Theme</span>
                                         <span class="header-tool-note">Choose the look you want</span>
                                     </span>
-                                </label>
-                                <select id="theme-select" class="theme-select" onchange="setThemeFromMenu(this.value)" aria-label="Choose theme">
+                                </div>
+                                <select id="theme-select" class="theme-select tool-control-full"
+                                        onchange="setThemeFromMenu(this.value)" aria-label="Choose theme">
                                     <option value="midnight-cute">Midnight Cute</option>
-                                    <option value="cute">Cute</option>
+                                    <option value="cute">Cute (Pink)</option>
                                     <option value="ink">Ink (Dark)</option>
                                     <option value="classic">Classic</option>
                                 </select>
                             </div>
+
                         </div>
                     </div>
                 </div>
@@ -132,6 +266,16 @@
             <!-- Floating Date -->
             <div id="floating-date" class="floating-date">
                 <span class="floating-date-label">Today</span>
+            </div>
+
+            <!-- Jump Mode Banner -->
+            <div id="jump-banner" class="jump-banner" style="display:none;">
+                <span class="material-icons jump-banner-icon">calendar_today</span>
+                <span id="jump-banner-label" class="jump-banner-label">Dec 14, 2024</span>
+                <button class="jump-banner-back" onclick="exitJumpMode()">
+                    <span class="material-icons">keyboard_double_arrow_down</span>
+                    Back to recent
+                </button>
             </div>
 
             <!-- Messages Container -->
@@ -474,6 +618,52 @@
     <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;"
         onchange="handleImageSelect(event)">
     <input type="file" id="video-input" accept="video/*" style="display: none;" onchange="handleVideoSelect(event)">
+
+    <!-- Add to Home Screen Modal -->
+    <div id="add-to-home-modal" class="modal" style="display:none;" onclick="closeAddToHomeModal(event)">
+        <div class="modal-content add-to-home-content">
+            <div class="preview-header">
+                <h3>Add to Home Screen</h3>
+                <button onclick="closeAddToHomeModal()" class="icon-btn">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+
+            <div class="add-to-home-hero">
+                <div class="add-to-home-app-icon">💕</div>
+                <div class="add-to-home-app-name">Our Room</div>
+                <div class="add-to-home-app-sub">Opens full screen, just like a real app</div>
+            </div>
+
+            <div class="add-to-home-platforms">
+                <div class="add-to-home-platform">
+                    <div class="platform-header">
+                        <span class="material-icons platform-icon">android</span>
+                        <span class="platform-name">Android · Chrome</span>
+                    </div>
+                    <ol class="platform-steps">
+                        <li>Tap the <strong>⋮</strong> menu in the top-right corner</li>
+                        <li>Tap <strong>"Add to Home screen"</strong></li>
+                        <li>Tap <strong>"Add"</strong> to confirm</li>
+                    </ol>
+                </div>
+
+                <div class="add-to-home-divider"></div>
+
+                <div class="add-to-home-platform">
+                    <div class="platform-header">
+                        <span class="material-icons platform-icon">phone_iphone</span>
+                        <span class="platform-name">iPhone · Safari</span>
+                    </div>
+                    <ol class="platform-steps">
+                        <li>Tap the <strong>Share</strong> button <strong>⬆</strong> at the bottom</li>
+                        <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+                        <li>Tap <strong>"Add"</strong> in the top-right corner</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>
