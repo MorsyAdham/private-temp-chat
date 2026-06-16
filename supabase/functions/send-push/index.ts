@@ -41,9 +41,8 @@ serve(async (req) => {
         const staleEndpoints: string[] = [];
         await Promise.allSettled(
             data.map(async (row) => {
-                const sub = typeof row.subscription === "string"
-                    ? JSON.parse(row.subscription)
-                    : row.subscription;
+                let sub = row.subscription;
+                while (typeof sub === "string") sub = JSON.parse(sub);
                 try {
                     await webpush.sendNotification(sub, JSON.stringify({ title, body }));
                 } catch (err: any) {
