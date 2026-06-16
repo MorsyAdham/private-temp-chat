@@ -41,6 +41,9 @@
 
             <!-- Elephant + floating hearts -->
             <div class="login-elephant-wrap">
+                <div id="login-fifi-wrap" class="login-fifi-wrap" style="display:none;">
+                    <div id="login-fifi-bubble" class="login-fifi-bubble"></div>
+                </div>
                 <div class="login-hearts">
                     <span class="login-heart">&#x1F495;</span>
                     <span class="login-heart">&#x1FA77;</span>
@@ -149,19 +152,16 @@
             <!-- Header -->
             <div class="header">
                 <div class="header-left">
-                    <h2>Our Room 💕</h2>
+                    <h2>&#x1F495; Just us &#x1F495;</h2>
                     <div id="connection-status" class="status-indicator">
                         <span class="status-dot"></span>
                         <span class="status-text">Disconnected</span>
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button id="header-streak-card" class="header-mini-stat accent" onclick="openTodoModal()" title="Love Streak">
+                    <button id="header-streak-card" class="header-mini-stat accent" onclick="openTodoModal()" title="Daily Checklist &amp; Love Streak">
                         <span id="header-streak-icon" class="material-icons">local_fire_department</span>
                         <strong id="header-streak-text">0</strong>
-                    </button>
-                    <button id="todo-btn" class="icon-btn header-bubble-btn todo" onclick="openTodoModal()" title="Daily Checklist">
-                        <span class="material-icons">favorite</span>
                     </button>
                     <button id="reload-btn" class="icon-btn header-bubble-btn" onclick="reloadChat()" title="Reload">
                         <span class="material-icons">refresh</span>
@@ -172,16 +172,8 @@
                         </button>
                         <div id="header-tools-menu" class="header-tools-menu" style="display: none;">
 
-                            <!-- Actions -->
-                            <button id="app-view-btn" type="button" class="header-tool-item" onclick="toggleAppViewFromMenu()">
-                                <span class="header-tool-bubble">
-                                    <span id="app-view-icon" class="material-icons">smartphone</span>
-                                </span>
-                                <span class="header-tool-copy">
-                                    <span id="app-view-label" class="header-tool-label">App View</span>
-                                    <span class="header-tool-note">Expanded mobile-style layout</span>
-                                </span>
-                            </button>
+                            <!-- Chat section -->
+                            <div class="header-tool-section">Chat</div>
 
                             <button type="button" class="header-tool-item" onclick="toggleSearchFromMenu()">
                                 <span class="header-tool-bubble">
@@ -193,19 +185,6 @@
                                 </span>
                             </button>
 
-                            <button id="add-to-home-btn" type="button" class="header-tool-item" onclick="addToHomeScreen()">
-                                <span class="header-tool-bubble">
-                                    <span id="add-home-icon" class="material-icons">add_to_home_screen</span>
-                                </span>
-                                <span class="header-tool-copy">
-                                    <span class="header-tool-label">Add to Home Screen</span>
-                                    <span id="add-home-note" class="header-tool-note">Install as an app on your phone</span>
-                                </span>
-                            </button>
-
-                            <div class="header-tool-divider"></div>
-
-                            <!-- Settings (stacked: label row + full-width control) -->
                             <div class="header-tool-item header-tool-item--stacked">
                                 <div class="header-tool-row">
                                     <span class="header-tool-bubble">
@@ -219,6 +198,11 @@
                                 <input type="date" id="jump-date-input" class="jump-date-input tool-control-full"
                                        onchange="jumpToDateFromMenu(this.value)" title="Pick a date">
                             </div>
+
+                            <div class="header-tool-divider"></div>
+
+                            <!-- Appearance section -->
+                            <div class="header-tool-section">Appearance</div>
 
                             <div class="header-tool-item header-tool-item--stacked">
                                 <div class="header-tool-row">
@@ -239,41 +223,65 @@
                                 </select>
                             </div>
 
+                            <button id="app-view-btn" type="button" class="header-tool-item" onclick="toggleAppViewFromMenu()">
+                                <span class="header-tool-bubble">
+                                    <span id="app-view-icon" class="material-icons">smartphone</span>
+                                </span>
+                                <span class="header-tool-copy">
+                                    <span id="app-view-label" class="header-tool-label">App View</span>
+                                    <span class="header-tool-note">Expanded mobile-style layout</span>
+                                </span>
+                            </button>
+
                             <div class="header-tool-divider"></div>
 
-                            <!-- Notification settings -->
-                            <button id="checklist-popup-mute-btn" type="button" class="header-tool-item" onclick="toggleChecklistPopupMute()">
-                                <span class="header-tool-bubble">
-                                    <span class="material-icons">notifications_active</span>
-                                </span>
-                                <span class="header-tool-copy">
-                                    <span class="header-tool-label">Checklist popup</span>
-                                    <span class="header-tool-note">Reminder on login</span>
-                                </span>
-                            </button>
+                            <!-- Notifications section -->
+                            <div class="header-tool-section">Notifications</div>
 
-                            <button id="chrome-notif-mute-btn" type="button" class="header-tool-item" onclick="toggleChromeNotifMute()">
-                                <span class="header-tool-bubble">
-                                    <span class="material-icons">notifications_active</span>
-                                </span>
-                                <span class="header-tool-copy">
-                                    <span class="header-tool-label">Chrome alerts</span>
-                                    <span class="header-tool-note">Browser notifications</span>
-                                </span>
-                            </button>
+                            <div class="notif-toggles-row">
+                                <button id="checklist-popup-mute-btn" type="button" class="notif-toggle-btn" onclick="toggleChecklistPopupMute()" title="Checklist reminder on login">
+                                    <span class="notif-toggle-icon">&#x2764;&#xFE0F;</span>
+                                    <span class="notif-toggle-label">Checklist</span>
+                                </button>
+                                <button id="chrome-notif-mute-btn" type="button" class="notif-toggle-btn" onclick="toggleChromeNotifMute()" title="In-app alerts">
+                                    <svg class="notif-logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M50,50 L8,26 A48,48 0 0,1 92,26 Z" fill="#EA4335"/>
+                                        <path d="M50,50 L92,26 A48,48 0 0,1 50,98 Z" fill="#34A853"/>
+                                        <path d="M50,50 L50,98 A48,48 0 0,1 8,26 Z" fill="#FBBC04"/>
+                                        <circle cx="50" cy="50" r="24" fill="white"/>
+                                        <circle cx="50" cy="50" r="17" fill="#4285F4"/>
+                                    </svg>
+                                    <span class="notif-toggle-label">Alerts</span>
+                                </button>
+                                <button id="telegram-mute-btn" type="button" class="notif-toggle-btn nobody-only" onclick="toggleTelegramMute()" title="Telegram activity pings" style="display:none;">
+                                    <svg class="notif-logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="50" cy="50" r="50" fill="#2AABEE"/>
+                                        <path fill="white" d="M15.5 47.6l59.2-22.8c2.7-1 5.1.7 4.2 4.9L70.5 78.3c-.7 3.3-2.7 4.1-5.4 2.5l-15-11-7.2 6.9c-.8.8-1.5 1.5-3 1.5l1.1-15.4 27.6-24.9c1.2-1.1-.3-1.7-1.8-.6L26.6 65.7l-14.4-4.5c-3.1-1-3.2-3.1.7-4.6z"/>
+                                    </svg>
+                                    <span class="notif-toggle-label">Telegram</span>
+                                </button>
+                            </div>
 
-                            <button id="telegram-mute-btn" type="button" class="header-tool-item nobody-only" onclick="toggleTelegramMute()" style="display:none;">
+                            <div class="header-tool-divider"></div>
+
+                            <!-- Install section -->
+                            <div class="header-tool-section">Device</div>
+
+                            <button id="add-to-home-btn" type="button" class="header-tool-item" onclick="addToHomeScreen()">
                                 <span class="header-tool-bubble">
-                                    <span class="material-icons">send</span>
+                                    <span id="add-home-icon" class="material-icons">add_to_home_screen</span>
                                 </span>
                                 <span class="header-tool-copy">
-                                    <span class="header-tool-label">Telegram alerts</span>
-                                    <span class="header-tool-note">Activity pings to Telegram</span>
+                                    <span class="header-tool-label">Add to Home Screen</span>
+                                    <span id="add-home-note" class="header-tool-note">Install as an app</span>
                                 </span>
                             </button>
 
                         </div>
                     </div>
+                    <button class="icon-btn header-bubble-btn logout-btn" onclick="logout()" title="Sign out">
+                        <span class="material-icons">logout</span>
+                    </button>
                 </div>
             </div>
 

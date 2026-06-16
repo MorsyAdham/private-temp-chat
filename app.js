@@ -14,6 +14,9 @@ const CONFIG = {
     pagination: {
         initialLoad: 200,
         pageSize: 1000
+    },
+    vapid: {
+        publicKey: "BDNr_hcau1wH8wi6hT5L98_J0Vguop-8oi7x0vVQSGyRH96_kiAePm6rYiBmLY6zHEUQHcA1Q2LkAlSp9ptiB8g"
     }
 };
 
@@ -98,7 +101,55 @@ const APP_VIEW_STORAGE_KEY = "private-chat-app-view-v1";
 const CHECKLIST_POPUP_MUTED_KEY = "private-chat-checklist-popup-muted-v1";
 const TELEGRAM_MUTED_KEY = "private-chat-telegram-muted-v1";
 const CHROME_NOTIF_MUTED_KEY = "private-chat-chrome-notif-muted-v1";
+const PUSH_DEFAULTS_APPLIED_KEY = "private-chat-push-defaults-applied-v1";
 const ELEPHANT_NAME = "Fifi";
+
+// ── Web Push helpers ──────────────────────────────────────────────────────────
+function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(base64);
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+function getRecipientEmail() {
+    if (state.currentUserEmail === "adhammorsy2311@gmail.com") return "ayaessam487@gmail.com";
+    if (state.currentUserEmail === "ayaessam487@gmail.com") return "adhammorsy2311@gmail.com";
+    return null;
+}
+
+async function subscribeToWebPush() {
+    try {
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+        if (Notification.permission !== "granted") return;
+        if (!CONFIG.vapid.publicKey) return;
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+            sub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(CONFIG.vapid.publicKey)
+            });
+        }
+        await state.supabaseClient.from("push_subscriptions").upsert(
+            { user_email: state.currentUserEmail, subscription: JSON.stringify(sub.toJSON()) },
+            { onConflict: "user_email" }
+        );
+    } catch (err) {
+        console.warn("Web Push subscribe:", err);
+    }
+}
+
+async function sendWebPushToRecipient(title, body) {
+    try {
+        if (!CONFIG.vapid.publicKey) return;
+        const to_email = getRecipientEmail();
+        if (!to_email) return;
+        await state.supabaseClient.functions.invoke("send-push", { body: { to_email, title, body } });
+    } catch (err) {
+        console.warn("Web Push send:", err);
+    }
+}
 const THEMES = {
     "midnight-cute": {
         emoji: "💕",
@@ -207,6 +258,17 @@ window.login = async function () {
 
         state.currentUserEmail = data.user.email;
         await requestNotificationPermission();
+
+        // Apply per-user notification defaults once per device.
+        // Aya: Chrome alerts off by default (she uses Telegram). Adham: on by default.
+        if (localStorage.getItem(PUSH_DEFAULTS_APPLIED_KEY) === null) {
+            if (isMyLove()) localStorage.setItem(CHROME_NOTIF_MUTED_KEY, "true");
+            localStorage.setItem(PUSH_DEFAULTS_APPLIED_KEY, "true");
+        }
+
+        // Subscribe this device to Web Push so background notifications work
+        await subscribeToWebPush();
+
         showChatScreen();
         await updatePresence(true);
 
@@ -1625,10 +1687,7 @@ async function setupRealtimeSubscription() {
         const el = document.querySelector(`[data-message-id="${messageId}"]`);
         if (el) {
             const c = el.querySelector(".message-image-container");
-            if (c) {
-                c.innerHTML = '<div class="image-viewed-overlay"><span class="material-icons" style="font-size:18px">photo_camera</span> Opened</div>';
-                c.style.cssText = "width:200px;height:160px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;";
-            }
+            if (c) renderExpiredMediaState(c, "📷", "Photo opened 💕", "She saw it 🌸");
         }
     });
 
@@ -1638,7 +1697,7 @@ async function setupRealtimeSubscription() {
         const el = document.querySelector(`[data-message-id="${messageId}"]`);
         if (el) {
             const c = el.querySelector(".message-video-container");
-            if (c) renderExpiredMediaState(c, "videocam", "Opened");
+            if (c) renderExpiredMediaState(c, "🎥", "Video opened 💕", "She watched it 🌸");
         }
     });
 
@@ -1880,6 +1939,10 @@ window.send = async function () {
         await state.channel.send({ type: "broadcast", event: "new-message", payload: data });
 
         myLoveNotify(`sent a message: "${text}" 💬`);
+        sendWebPushToRecipient(
+            (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
+            text.length > 100 ? text.substring(0, 100) + "…" : text
+        );
 
         textarea.value = "";
         textarea.style.height = "40px";
@@ -2679,14 +2742,12 @@ function renderImageContent(bubble, message, isSender) {
     const hasViewed = viewedBy.includes(state.currentUserEmail);
     const wasOpened = viewedBy.length > 0;
 
-    const viewedStyle = "width:200px;height:160px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:13px;gap:6px;";
-
     if (viewOnce && (hasViewed || (isSender && wasOpened))) {
-        container.style.cssText = viewedStyle;
-        container.innerHTML = `<span class="material-icons">photo_camera</span> ${isSender ? "Opened" : "Viewed"}`;
+        renderExpiredMediaState(container, "📷",
+            isSender ? "Photo opened 💕" : "Viewed once 💕",
+            isSender ? "She saw it 🌸" : "Just for your eyes 💕");
     } else if (viewOnce && isSender && !wasOpened) {
-        container.style.cssText = viewedStyle;
-        container.innerHTML = '<span class="material-icons">send</span> Sent';
+        renderExpiredMediaState(container, "💌", "Sent", "Waiting for her 🌸");
     } else {
         const img = document.createElement("img");
         img.className = "message-image";
@@ -2710,9 +2771,14 @@ function renderImageContent(bubble, message, isSender) {
     bubble.appendChild(container);
 }
 
-function renderExpiredMediaState(container, iconName, label) {
-    container.style.cssText = "width:200px;height:160px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:13px;gap:6px;";
-    container.innerHTML = `<span class="material-icons">${iconName}</span> ${label}`;
+function renderExpiredMediaState(container, emoji, label, sublabel) {
+    container.removeAttribute("style");
+    if (!container.classList.contains("vo-expired-card")) container.classList.add("vo-expired-card");
+    container.innerHTML = `<div class="vo-expired-inner">
+        <span class="vo-expired-icon">${emoji}</span>
+        <span class="vo-expired-label">${label}</span>
+        ${sublabel ? `<span class="vo-expired-sub">${sublabel}</span>` : ""}
+    </div>`;
 }
 
 // --- Video content ---
@@ -2725,9 +2791,11 @@ function renderVideoContent(bubble, message, isSender) {
     const wasOpened = viewedBy.length > 0;
 
     if (viewOnce && (hasViewed || (isSender && wasOpened))) {
-        renderExpiredMediaState(container, "videocam", isSender ? "Opened" : "Viewed");
+        renderExpiredMediaState(container, "🎥",
+            isSender ? "Video opened 💕" : "Viewed once 💕",
+            isSender ? "She watched it 🌸" : "Just for your eyes 💕");
     } else if (viewOnce && isSender && !wasOpened) {
-        renderExpiredMediaState(container, "send", "Sent");
+        renderExpiredMediaState(container, "💌", "Sent", "Waiting for her 🌸");
     } else {
         container.style.cssText = "position:relative;width:200px;height:150px;background:#1e293b;border-radius:8px;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;";
         container.innerHTML = `
@@ -2951,11 +3019,21 @@ async function markVisibleMessagesAsRead() {
 // PART 3 — NOTIFICATIONS
 // ============================================================================
 
-function showNotification(title, body) {
+async function showNotification(title, body) {
     if (localStorage.getItem(CHROME_NOTIF_MUTED_KEY) === "true") return;
-    if ("Notification" in window && Notification.permission === "granted") {
-        new Notification(title, { body });
-    }
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    // Note: these are foreground-only notifications (app must be open).
+    // Background notifications require Web Push — handled via Telegram instead.
+    try {
+        if ("serviceWorker" in navigator) {
+            const reg = await navigator.serviceWorker.getRegistration();
+            if (reg) {
+                reg.showNotification(title, { body, vibrate: [100, 50, 100] });
+                return;
+            }
+        }
+    } catch (_) {}
+    new Notification(title, { body });
 }
 
 async function sendTelegramNotification(message) {
@@ -3011,33 +3089,26 @@ window.toggleChromeNotifMute = function () {
     updateMenuMuteStates();
 };
 
+window.logout = async function () {
+    try {
+        if (state.currentUserEmail) await updatePresence(false);
+        if (state.channel) { state.channel.unsubscribe(); state.channel = null; }
+        if (state.todoDayWatcher) clearInterval(state.todoDayWatcher);
+        if (state.todoReminderWatcher) clearInterval(state.todoReminderWatcher);
+        await state.supabaseClient.auth.signOut();
+    } catch (err) { console.error("Logout:", err); }
+    window.location.reload();
+};
+
 function updateMenuMuteStates() {
     const checklistMuted = localStorage.getItem(CHECKLIST_POPUP_MUTED_KEY) === "true";
-    const btn1 = document.getElementById("checklist-popup-mute-btn");
-    if (btn1) {
-        btn1.querySelector(".header-tool-label").textContent = checklistMuted ? "Checklist popup (muted)" : "Checklist popup";
-        btn1.querySelector(".header-tool-note").textContent = checklistMuted ? "Tap to re-enable" : "Reminder on login";
-        btn1.querySelector(".material-icons").textContent = checklistMuted ? "notifications_off" : "notifications_active";
-        btn1.classList.toggle("tool-muted", checklistMuted);
-    }
+    document.getElementById("checklist-popup-mute-btn")?.classList.toggle("tool-muted", checklistMuted);
 
     const chromeMuted = localStorage.getItem(CHROME_NOTIF_MUTED_KEY) === "true";
-    const btn2 = document.getElementById("chrome-notif-mute-btn");
-    if (btn2) {
-        btn2.querySelector(".header-tool-label").textContent = chromeMuted ? "Chrome alerts (muted)" : "Chrome alerts";
-        btn2.querySelector(".header-tool-note").textContent = chromeMuted ? "Tap to re-enable" : "Browser notifications";
-        btn2.querySelector(".material-icons").textContent = chromeMuted ? "notifications_off" : "notifications_active";
-        btn2.classList.toggle("tool-muted", chromeMuted);
-    }
+    document.getElementById("chrome-notif-mute-btn")?.classList.toggle("tool-muted", chromeMuted);
 
     const telegramMuted = localStorage.getItem(TELEGRAM_MUTED_KEY) === "true";
-    const btn3 = document.getElementById("telegram-mute-btn");
-    if (btn3) {
-        btn3.querySelector(".header-tool-label").textContent = telegramMuted ? "Telegram alerts (muted)" : "Telegram alerts";
-        btn3.querySelector(".header-tool-note").textContent = telegramMuted ? "Tap to re-enable" : "Activity pings to Telegram";
-        btn3.querySelector(".material-icons").textContent = telegramMuted ? "block" : "send";
-        btn3.classList.toggle("tool-muted", telegramMuted);
-    }
+    document.getElementById("telegram-mute-btn")?.classList.toggle("tool-muted", telegramMuted);
 }
 
 // ============================================================================
@@ -3062,8 +3133,50 @@ function updateFloatingDate() {
 }
 
 function showChatScreen() {
+    stopLoginFifiSpeech();
     document.getElementById("login").style.display = "none";
     document.getElementById("chat").style.display = "flex";
+}
+
+// ---- LOGIN SCREEN FIFI SPEECH ----
+const LOGIN_FIFI_LINES = [
+    "Hi! I'm Fifi 🐘",
+    "Welcome back! 💕",
+    "Ready for some love? 🌸",
+    "Type your password! 👀",
+    "I missed you! 🥺",
+    "Just you two 💕",
+    "So cute that you're here 🌸",
+    "Your little elephant says hi! 🐘",
+    "Keeping all your secrets safe 🔒",
+    "Log in, I'm waiting! ✨",
+    "Fifi loves you! 💕",
+];
+
+let loginFifiTimer = null;
+let loginFifiIndex = 0;
+
+function startLoginFifiSpeech() {
+    const wrap = document.getElementById("login-fifi-wrap");
+    const bubble = document.getElementById("login-fifi-bubble");
+    if (!wrap || !bubble) return;
+    loginFifiIndex = Math.floor(Math.random() * LOGIN_FIFI_LINES.length);
+    function show() {
+        bubble.textContent = LOGIN_FIFI_LINES[loginFifiIndex];
+        loginFifiIndex = (loginFifiIndex + 1) % LOGIN_FIFI_LINES.length;
+        bubble.classList.remove("pop-in");
+        void bubble.offsetWidth;
+        bubble.classList.add("pop-in");
+    }
+    wrap.style.display = "block";
+    show();
+    loginFifiTimer = setInterval(show, 2500);
+}
+
+function stopLoginFifiSpeech() {
+    if (loginFifiTimer) { clearInterval(loginFifiTimer); loginFifiTimer = null; }
+    const wrap = document.getElementById("login-fifi-wrap");
+    if (wrap) wrap.style.display = "none";
 }
 
 function updateMessageViewedState(messageId, viewerId = state.currentUserEmail) {
@@ -3463,16 +3576,10 @@ function renderTodoModal() {
     const totalScoreText = document.getElementById("todo-total-score-text");
     const subtitle = document.getElementById("todo-subtitle");
     const footerNote = document.getElementById("todo-footer-note");
-    const todoBtn = document.getElementById("todo-btn");
 
-    if (!list || !categoryNav || !weekNav || !progressText || !scoreText || !totalScoreText || !subtitle || !footerNote || !todoBtn) return;
+    if (!list || !categoryNav || !weekNav || !progressText || !scoreText || !totalScoreText || !subtitle || !footerNote) return;
 
-    if (!state.currentUserEmail || (!isMyLove() && !isNobody())) {
-        todoBtn.style.display = "none";
-        return;
-    }
-
-    todoBtn.style.display = "flex";
+    if (!state.currentUserEmail || (!isMyLove() && !isNobody())) return;
 
     if (!state.todoToday) {
         state.todoToday = createTodoRecord();
@@ -3987,6 +4094,10 @@ window.confirmImageSend = async function () {
             await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
             myLoveNotify(`sent ${viewOnce ? "a view-once photo 🔒" : "a photo 📷"}`);
+            sendWebPushToRecipient(
+                (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
+                viewOnce ? "🔒 View-once photo" : "📷 Sent a photo"
+            );
         }
         cancelReply();
         updateConnectionStatus("connected");
@@ -4020,10 +4131,7 @@ window.openImageViewer = async function (messageId, imagePath, viewOnce, viewedB
                 const el = document.querySelector(`[data-message-id="${messageId}"]`);
                 if (el) {
                     const c = el.querySelector(".message-image-container");
-                    if (c) {
-                        c.innerHTML = '<span class="material-icons">photo_camera</span> Photo viewed';
-                        c.style.cssText = "width:200px;height:160px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:13px;gap:6px;";
-                    }
+                    if (c) renderExpiredMediaState(c, "📷", "Viewed once 💕", "Just for your eyes 💕");
                 }
             }, 100);
 
@@ -4120,6 +4228,10 @@ window.confirmVideoSend = async function () {
         await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
         myLoveNotify(`sent ${viewOnce ? "a view-once video 🔒" : "a video 🎥"}`);
+        sendWebPushToRecipient(
+            (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
+            viewOnce ? "🔒 View-once video" : "🎥 Sent a video"
+        );
 
         cancelReply();
         updateConnectionStatus("connected");
@@ -4157,7 +4269,7 @@ window.openVideoViewer = async function (messageId, videoPath, viewOnce, viewedB
                 const el = document.querySelector(`[data-message-id="${messageId}"]`);
                 if (el) {
                     const c = el.querySelector(".message-video-container");
-                    if (c) renderExpiredMediaState(c, "videocam", "Viewed");
+                    if (c) renderExpiredMediaState(c, "🎥", "Viewed once 💕", "Just for your eyes 💕");
                 }
             }, 100);
 
@@ -4427,6 +4539,10 @@ window.sendVoiceRecording = async function () {
         await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
         myLoveNotify(`sent a voice message (${durationLabel}) 🎤`);
+        sendWebPushToRecipient(
+            (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
+            `🎤 Voice message (${durationLabel})`
+        );
 
         clearVoicePreviewAudio();
         resetVoiceComposerUI();
@@ -4601,6 +4717,7 @@ document.addEventListener("DOMContentLoaded", () => {
     syncViewportLayout();
     setupElephantInteraction();
     setupAutoLoadScroll();
+    startLoginFifiSpeech();
 
     const msgTextarea = document.getElementById("msg");
 

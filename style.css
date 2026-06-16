@@ -483,6 +483,70 @@ body.app-view-enabled .container {
   align-items: flex-end;
   justify-content: center;
   margin-bottom: 4px;
+  overflow: visible;
+}
+
+/* Fifi's floating speech bubble on the login screen */
+.login-fifi-wrap {
+  position: absolute;
+  bottom: calc(100% + 16px);
+  left: 50%;
+  z-index: 10;
+  /* translateX(-50%) MUST live inside the keyframes — animation overrides element transform */
+  animation: fifi-float 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.login-fifi-bubble {
+  background: var(--primary, #d060a0);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 50px; /* fully pill/oval — softer than a message box */
+  white-space: nowrap;
+  position: relative;
+  /* white outline gives the hand-drawn speech-bubble feel */
+  border: 2.5px solid rgba(255,255,255,0.55);
+  box-shadow:
+    0 8px 26px rgba(0,0,0,0.32),
+    0 2px 0 rgba(255,255,255,0.32) inset;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.22);
+}
+
+/* sparkle before every line */
+.login-fifi-bubble::before {
+  content: '✨ ';
+  font-size: 11px;
+}
+
+/* speech bubble tail — wider and chunkier than a message-box triangle */
+.login-fifi-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 11px solid var(--primary, #d060a0);
+}
+
+.login-fifi-bubble.pop-in {
+  animation: fifi-msg-pop 0.38s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+/* include translateX(-50%) in EVERY keyframe so centering is never lost */
+@keyframes fifi-float {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%       { transform: translateX(-50%) translateY(-11px); }
+}
+@keyframes fifi-msg-pop {
+  from { opacity: 0; transform: scale(0.72); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 .login-hearts {
@@ -800,6 +864,87 @@ input:focus { border-color: var(--primary); }
   background: var(--border);
   margin: 2px 4px;
   opacity: 0.7;
+}
+
+/* Section label inside menu */
+.header-tool-section {
+  padding: 10px 14px 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--primary);
+  opacity: 0.75;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Compact notification toggle row */
+.notif-toggles-row {
+  display: flex;
+  gap: 7px;
+  padding: 2px 0;
+}
+
+.notif-toggle-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 6px 9px;
+  border: 1.5px solid var(--primary);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  min-height: 62px;
+}
+
+.notif-toggle-btn:hover {
+  background: rgba(255,255,255,0.12);
+  transform: translateY(-1px);
+}
+
+.notif-toggle-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.notif-tg-svg,
+.notif-logo-svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.notif-toggle-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.notif-toggle-btn.tool-muted {
+  opacity: 0.38;
+  filter: grayscale(0.6);
+  border-color: rgba(255,255,255,0.12);
+}
+
+/* Logout button in header */
+.logout-btn {
+  color: var(--primary);
+  opacity: 0.85;
+}
+.logout-btn:hover {
+  opacity: 1;
+  color: #e86c8a;
 }
 
 .header-tool-item {
@@ -1820,6 +1965,52 @@ body[data-theme="cute"] .system-todo-encouragement {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* View-once photo/video — opened/expired card */
+.vo-expired-card {
+  width: 200px;
+  height: 130px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, var(--primary, #c060a8) 0%, #6a35a0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: default;
+  position: relative;
+}
+.vo-expired-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.2) 0%, transparent 55%);
+  pointer-events: none;
+}
+.vo-expired-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: #fff;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+.vo-expired-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+.vo-expired-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.28);
+}
+.vo-expired-sub {
+  font-size: 10.5px;
+  opacity: 0.78;
+  font-weight: 400;
 }
 
 .image-viewed-overlay,

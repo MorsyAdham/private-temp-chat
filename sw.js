@@ -1,7 +1,7 @@
 // Service worker — enables PWA install prompt on Android Chrome
 // Network-first for app files so updates are always picked up on normal refresh.
 // Falls back to cache only when offline.
-const CACHE = 'our-room-v5';
+const CACHE = 'our-room-v7';
 const STATIC = ['/', '/index.html', '/style.css', '/app.js', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', e => {
@@ -15,6 +15,29 @@ self.addEventListener('activate', e => {
         caches.keys().then(keys =>
             Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
         ).then(() => self.clients.claim())
+    );
+});
+
+self.addEventListener('push', e => {
+    let data = { title: '💕 Just us', body: 'New message' };
+    try { data = e.data.json(); } catch (_) {}
+    e.waitUntil(
+        self.registration.showNotification(data.title, {
+            body: data.body,
+            tag: 'chat-message',
+            renotify: true,
+            vibrate: [100, 50, 100]
+        })
+    );
+});
+
+self.addEventListener('notificationclick', e => {
+    e.notification.close();
+    e.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(wcs => {
+            if (wcs.length > 0) return wcs[0].focus();
+            return clients.openWindow('/');
+        })
     );
 });
 
