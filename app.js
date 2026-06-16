@@ -275,8 +275,7 @@ window.login = async function () {
         showChatScreen();
         await updatePresence(true);
 
-        myLoveNotify("logged in 🔑");
-        sendWebPushToRecipient((USER_NAMES[state.currentUserEmail] || "Someone") + " 💕", "just logged in 🔑");
+        notifyPartner("just logged in 🔑");
 
         updateMenuMuteStates();
         if (isNobody()) {
@@ -1434,8 +1433,7 @@ window.reloadChat = async function () {
         await loadInitialMessages();
         await setupRealtimeSubscription();
         updateConnectionStatus("connected");
-        myLoveNotify("reloaded the chat 🔄");
-        sendWebPushToRecipient((USER_NAMES[state.currentUserEmail] || "Someone") + " 💕", "reloaded the chat 🔄");
+        notifyPartner("reloaded the chat 🔄");
     } catch (error) {
         console.error("Reload error:", error);
         updateConnectionStatus("disconnected");
@@ -1798,7 +1796,7 @@ window.searchMessages = function () {
     document.querySelectorAll(".message-bubble.highlight").forEach(el => el.classList.remove("highlight"));
     if (!query) { state.searchResults = []; state.currentSearchIndex = -1; return; }
 
-    myLoveNotify(`searched for "${query}" 🔍`);
+    notifyPartner(`searched for "${query}" 🔍`);
 
     state.searchResults = state.allMessages.filter(m =>
         m.text && m.text.toLowerCase().includes(query)
@@ -1844,7 +1842,7 @@ window.setReply = function (messageId) {
                 message.message_type === "voice" ? "🎤 Voice message" :
                     (message.text || "");
 
-    myLoveNotify(`is replying to ${USER_NAMES[message.sender] || message.sender}: "${replyPreviewText}" ↩️`);
+    notifyPartner(`↩️ replying to: "${replyPreviewText}"`);
 
     const previewEl = document.getElementById("reply-preview");
     document.getElementById("reply-name").textContent = USER_NAMES[message.sender] || message.sender;
@@ -1943,11 +1941,7 @@ window.send = async function () {
         scrollToBottom(true);
         await state.channel.send({ type: "broadcast", event: "new-message", payload: data });
 
-        myLoveNotify(`sent a message: "${text}" 💬`);
-        sendWebPushToRecipient(
-            (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
-            text.length > 100 ? text.substring(0, 100) + "…" : text
-        );
+        notifyPartner(text.length > 100 ? text.substring(0, 100) + "…" : text);
 
         textarea.value = "";
         textarea.style.height = "40px";
@@ -2536,11 +2530,7 @@ async function toggleMessageReaction(messageId, emoji) {
         }
 
         const actionText = hadUserReaction ? "removed" : "reacted";
-        myLoveNotify(`${actionText} ${emoji} to ${getReactionMessagePreview(message)}`);
-        sendWebPushToRecipient(
-            (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
-            `${actionText} ${emoji} to your message`
-        );
+        notifyPartner(`${actionText} ${emoji} to: "${getReactionMessagePreview(message)}"`);
     } catch (error) {
         console.error("Reaction update error:", error);
         if (isReactionColumnUnavailableError(error)) {
@@ -3045,19 +3035,27 @@ async function showNotification(title, body) {
     new Notification(title, { body });
 }
 
-async function sendTelegramNotification(message) {
+async function sendTelegramNotification(title, body) {
     if (localStorage.getItem(TELEGRAM_MUTED_KEY) === "true") return;
     try {
+        const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const text = `<b>${esc(title)}</b>\n${esc(body)}`;
         await fetch(`https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chat_id: CONFIG.telegram.chatId, text: message })
+            body: JSON.stringify({ chat_id: CONFIG.telegram.chatId, text, parse_mode: "HTML" })
         });
     } catch (err) { console.error("Telegram:", err); }
 }
 
 function isMyLove() { return state.currentUserEmail === "ayaessam487@gmail.com"; }
-function myLoveNotify(msg) { if (isMyLove()) sendTelegramNotification(`💕 My Love ${msg}`); }
+
+// Sends Chrome push + Telegram (Telegram only if current user is My Love)
+function notifyPartner(body) {
+    const label = (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕";
+    sendWebPushToRecipient(label, body);
+    if (isMyLove()) sendTelegramNotification(label, body);
+}
 
 // ---- CHECKLIST POPUP ----
 function showChecklistReminderPopup() {
@@ -3123,7 +3121,7 @@ window.toggleChromeNotifMute = async function () {
 window.logout = async function () {
     try {
         if (state.currentUserEmail) {
-            sendWebPushToRecipient((USER_NAMES[state.currentUserEmail] || "Someone") + " 💕", "logged out 👋");
+            notifyPartner("logged out 👋");
             await updatePresence(false);
         }
         if (state.channel) { state.channel.unsubscribe(); state.channel = null; }
@@ -4131,11 +4129,7 @@ window.confirmImageSend = async function () {
             scrollToBottom(true);
             await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-            myLoveNotify(`sent ${viewOnce ? "a view-once photo 🔒" : "a photo 📷"}`);
-            sendWebPushToRecipient(
-                (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
-                viewOnce ? "🔒 View-once photo" : "📷 Sent a photo"
-            );
+            notifyPartner(viewOnce ? "🔒 View-once photo" : "📷 Sent a photo");
         }
         cancelReply();
         updateConnectionStatus("connected");
@@ -4177,11 +4171,7 @@ window.openImageViewer = async function (messageId, imagePath, viewOnce, viewedB
                 state.channel.send({ type: "broadcast", event: "image-viewed", payload: { messageId, viewerId: state.currentUserEmail } });
             }
 
-            myLoveNotify(`opened ${USER_NAMES[senderEmail] || senderEmail}'s view-once photo 👀`);
-            sendWebPushToRecipient(
-                (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
-                "opened your view-once photo 👀"
-            );
+            notifyPartner("opened your view-once photo 👀");
         }
     } catch (err) {
         console.error("openImageViewer:", err);
@@ -4269,11 +4259,7 @@ window.confirmVideoSend = async function () {
         scrollToBottom(true);
         await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-        myLoveNotify(`sent ${viewOnce ? "a view-once video 🔒" : "a video 🎥"}`);
-        sendWebPushToRecipient(
-            (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
-            viewOnce ? "🔒 View-once video" : "🎥 Sent a video"
-        );
+        notifyPartner(viewOnce ? "🔒 View-once video" : "🎥 Sent a video");
 
         cancelReply();
         updateConnectionStatus("connected");
@@ -4319,19 +4305,11 @@ window.openVideoViewer = async function (messageId, videoPath, viewOnce, viewedB
                 state.channel.send({ type: "broadcast", event: "video-viewed", payload: { messageId, viewerId: state.currentUserEmail } });
             }
 
-            myLoveNotify(`opened ${USER_NAMES[senderEmail] || senderEmail}'s view-once video 👀`);
-            sendWebPushToRecipient(
-                (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
-                "opened your view-once video 👀"
-            );
+            notifyPartner("opened your view-once video 👀");
             return;
         }
 
-        myLoveNotify("opened a video 🎬");
-        sendWebPushToRecipient(
-            (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
-            "opened a video 🎬"
-        );
+        notifyPartner("opened a video 🎬");
     } catch (err) {
         console.error("openVideoViewer:", err);
         showAlert("Failed to load video");
@@ -4389,7 +4367,7 @@ window.toggleVoiceRecording = async function () {
         };
 
         recorder.start();
-        myLoveNotify("started recording a voice message 🎙️");
+        notifyPartner("started recording a voice message 🎙️");
 
         document.querySelector(".input-area").style.display = "none";
         document.getElementById("voice-recording").style.display = "flex";
@@ -4588,11 +4566,7 @@ window.sendVoiceRecording = async function () {
         scrollToBottom(true);
         await state.channel.send({ type: "broadcast", event: "new-message", payload: msgData });
 
-        myLoveNotify(`sent a voice message (${durationLabel}) 🎤`);
-        sendWebPushToRecipient(
-            (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
-            `🎤 Voice message (${durationLabel})`
-        );
+        notifyPartner(`🎤 Voice message (${durationLabel})`);
 
         clearVoicePreviewAudio();
         resetVoiceComposerUI();
