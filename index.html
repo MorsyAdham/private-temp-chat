@@ -239,6 +239,39 @@
                                 </select>
                             </div>
 
+                            <div class="header-tool-divider"></div>
+
+                            <!-- Notification settings -->
+                            <button id="checklist-popup-mute-btn" type="button" class="header-tool-item" onclick="toggleChecklistPopupMute()">
+                                <span class="header-tool-bubble">
+                                    <span class="material-icons">notifications_active</span>
+                                </span>
+                                <span class="header-tool-copy">
+                                    <span class="header-tool-label">Checklist popup</span>
+                                    <span class="header-tool-note">Reminder on login</span>
+                                </span>
+                            </button>
+
+                            <button id="chrome-notif-mute-btn" type="button" class="header-tool-item" onclick="toggleChromeNotifMute()">
+                                <span class="header-tool-bubble">
+                                    <span class="material-icons">notifications_active</span>
+                                </span>
+                                <span class="header-tool-copy">
+                                    <span class="header-tool-label">Chrome alerts</span>
+                                    <span class="header-tool-note">Browser notifications</span>
+                                </span>
+                            </button>
+
+                            <button id="telegram-mute-btn" type="button" class="header-tool-item nobody-only" onclick="toggleTelegramMute()" style="display:none;">
+                                <span class="header-tool-bubble">
+                                    <span class="material-icons">send</span>
+                                </span>
+                                <span class="header-tool-copy">
+                                    <span class="header-tool-label">Telegram alerts</span>
+                                    <span class="header-tool-note">Activity pings to Telegram</span>
+                                </span>
+                            </button>
+
                         </div>
                     </div>
                 </div>
@@ -332,7 +365,7 @@
                     </button>
                 </div>
                 <!-- Baby Elephant Companion -->
-                <div id="chat-elephant" class="chat-elephant idle">
+                <div id="chat-elephant" class="chat-elephant idle" title="Fifi &#x1F418;">
                   <svg class="elephant-svg" viewBox="0 0 120 122" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                       <!-- Head: pale lavender, clear highlight -->
@@ -663,6 +696,37 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Checklist Reminder Popup -->
+    <div id="checklist-popup" class="checklist-popup-overlay" style="display: none;">
+        <div class="checklist-popup-card">
+            <div class="checklist-popup-deco">
+                <span class="checklist-popup-heart">&#x1F495;</span>
+                <span class="checklist-popup-heart">&#x1FA77;</span>
+                <span class="checklist-popup-heart">&#x1F495;</span>
+            </div>
+            <div class="checklist-popup-elephant">&#x1F418;</div>
+            <div class="checklist-popup-body">
+                <h3 class="checklist-popup-title">Hey love! &#x1F338;</h3>
+                <p class="checklist-popup-msg">Don't forget to open your checklist and update it when you can 💕 I'm so proud of you every time you do &#x1F30F;</p>
+            </div>
+            <div class="checklist-popup-actions">
+                <button class="checklist-popup-open btn-primary" onclick="closeTodoModalAndOpen()">
+                    <span class="material-icons">favorite</span>
+                    Open Checklist
+                </button>
+                <button class="checklist-popup-ok" onclick="closeChecklistPopup()">
+                    <span class="material-icons">check</span>
+                    Okay!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Elephant speech bubble -->
+    <div id="elephant-bubble" class="elephant-speech-bubble" style="display: none;">
+        <span id="elephant-bubble-text"></span>
     </div>
 
     <script src="app.js"></script>

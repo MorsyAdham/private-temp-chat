@@ -95,6 +95,10 @@ const DAILY_TODO_TABLE = "daily_todo_records";
 const DAILY_TODO_SYNC_PREFIX = "__daily_todo_sync__:";
 const THEME_STORAGE_KEY = "private-chat-theme-v1";
 const APP_VIEW_STORAGE_KEY = "private-chat-app-view-v1";
+const CHECKLIST_POPUP_MUTED_KEY = "private-chat-checklist-popup-muted-v1";
+const TELEGRAM_MUTED_KEY = "private-chat-telegram-muted-v1";
+const CHROME_NOTIF_MUTED_KEY = "private-chat-chrome-notif-muted-v1";
+const ELEPHANT_NAME = "Fifi";
 const THEMES = {
     "midnight-cute": {
         emoji: "💕",
@@ -208,8 +212,16 @@ window.login = async function () {
 
         myLoveNotify("logged in 🔑");
 
+        updateMenuMuteStates();
+        if (isNobody()) {
+            const telegramBtn = document.getElementById("telegram-mute-btn");
+            if (telegramBtn) telegramBtn.style.display = "";
+        }
+
         await initializeDailyTodo();
         await initializeChat();
+
+        if (!isNobody()) setTimeout(showChecklistReminderPopup, 600);
 
     } catch (error) {
         console.error("Login error:", error);
@@ -1262,7 +1274,6 @@ async function initializeDailyTodo() {
     }, 60000);
     maybeSendTodoReminder();
 
-    if (isMyLove()) openTodoModal();
 }
 
 // Renders text into a container, turning URLs into clickable <a> tags
@@ -1586,6 +1597,7 @@ async function setupRealtimeSubscription() {
 
         if (message.sender !== state.currentUserEmail) {
             hideTypingIndicator();
+            elephantOnMessageReceived();
             if (state.isAtBottom) await markMessageAsRead(message.id);
 
             const preview =
@@ -2007,11 +2019,60 @@ function elephantOnPeerTyping(active) {
 }
 
 // ---- INTERACTIVE TAPS ----
-const ELEPHANT_FUN_STATES = ["surprised", "playful", "shy", "winking", "playful", "surprised"];
+const ELEPHANT_FUN_STATES = ["surprised", "playful", "shy", "winking", "dancing", "love", "playful", "surprised"];
 let elephantFunIndex = 0;
 let elephantTapCount = 0;
 let elephantTapResetTimer = null;
 let elephantInteractionTimer = null;
+let elephantIdleSpeechTimer = null;
+
+const ELEPHANT_SPEECH_LINES = [
+    `Hi! I'm ${ELEPHANT_NAME} 🐘💕`,
+    "Tap me again! 🥰",
+    "You're so cute 💕",
+    "Miss you already 🌸",
+    "Send a message! 💌",
+    "I'm always here 🐘",
+    "You look beautiful today 🌷",
+    "Feeling playful today 🎉",
+    `${ELEPHANT_NAME} loves you! 💕`,
+    "Don't forget the checklist 🌸",
+];
+let elephantSpeechLineIndex = 0;
+
+function showElephantBubble(text, duration = 2800) {
+    const bubble = document.getElementById("elephant-bubble");
+    const textEl = document.getElementById("elephant-bubble-text");
+    const el = document.getElementById("chat-elephant");
+    if (!bubble || !textEl || !el) return;
+
+    textEl.textContent = text;
+    bubble.style.display = "block";
+
+    const rect = el.getBoundingClientRect();
+    bubble.style.left = (rect.left + rect.width / 2) + "px";
+    bubble.style.bottom = (window.innerHeight - rect.top + 6) + "px";
+
+    bubble.classList.remove("eb-fade-in");
+    void bubble.offsetWidth;
+    bubble.classList.add("eb-fade-in");
+    clearTimeout(bubble._hideTimer);
+    bubble._hideTimer = setTimeout(() => {
+        bubble.style.display = "none";
+        bubble.classList.remove("eb-fade-in");
+    }, duration);
+}
+
+function scheduleElephantIdleSpeech() {
+    clearTimeout(elephantIdleSpeechTimer);
+    elephantIdleSpeechTimer = setTimeout(() => {
+        if (elephantCurrentState === "idle") {
+            showElephantBubble(ELEPHANT_SPEECH_LINES[elephantSpeechLineIndex % ELEPHANT_SPEECH_LINES.length]);
+            elephantSpeechLineIndex++;
+        }
+        scheduleElephantIdleSpeech();
+    }, 18000 + Math.random() * 12000);
+}
 
 function elephantHandleTap() {
     clearTimeout(elephantTapResetTimer);
@@ -2022,19 +2083,32 @@ function elephantHandleTap() {
         const prevChatState = ["typing","thinking","waiting","happy"].includes(elephantCurrentState)
             ? elephantCurrentState : "idle";
 
-        if (elephantTapCount >= 4) {
-            // Many rapid taps = angry
+        if (elephantTapCount >= 5) {
             setElephantState("angry");
-            elephantInteractionTimer = setTimeout(() => setElephantState("idle"), 1800);
+            showElephantBubble("Hey!! That hurts! 😤");
+            elephantInteractionTimer = setTimeout(() => setElephantState("idle"), 2000);
+        } else if (elephantTapCount === 2) {
+            setElephantState("dancing");
+            showElephantBubble("Woo hoo! 🎉");
+            elephantInteractionTimer = setTimeout(() => {
+                setElephantState(["typing","thinking","waiting"].includes(prevChatState) ? prevChatState : "idle");
+            }, 2400);
         } else {
             const next = ELEPHANT_FUN_STATES[elephantFunIndex % ELEPHANT_FUN_STATES.length];
             elephantFunIndex++;
             setElephantState(next);
-            const duration = next === "winking" ? 2200
-                           : next === "shy"     ? 2000
-                           : 1600;
+            const speeches = {
+                surprised: "Oh! 😮",
+                playful: "Wheee! 🎊",
+                shy: "Heehee… 🙈",
+                winking: "😉 psst!",
+                dancing: "Let's dance! 💃",
+                love: "Love you! 💕"
+            };
+            if (speeches[next]) showElephantBubble(speeches[next]);
+            const duration = next === "winking" ? 2200 : next === "shy" ? 2000 : 1800;
             elephantInteractionTimer = setTimeout(() => {
-                if (["surprised","playful","shy","winking","angry","tickled"].includes(elephantCurrentState)) {
+                if (["surprised","playful","shy","winking","angry","tickled","dancing","love"].includes(elephantCurrentState)) {
                     setElephantState(["typing","thinking","waiting"].includes(prevChatState) ? prevChatState : "idle");
                 }
             }, duration);
@@ -2048,15 +2122,26 @@ function elephantHandleLongPress() {
     clearTimeout(elephantInteractionTimer);
     elephantTapCount = 0;
     setElephantState("tickled");
+    showElephantBubble("Hahaha!! 🤣 Stop it!!");
     elephantInteractionTimer = setTimeout(() => {
         setElephantState("happy");
+        showElephantBubble("That was fun! 💕");
         elephantHappyTimer = setTimeout(() => setElephantState("idle"), 1800);
     }, 1100);
+}
+
+function elephantOnMessageReceived() {
+    if (["typing","thinking","happy"].includes(elephantCurrentState)) return;
+    setElephantState("love");
+    elephantInteractionTimer = setTimeout(() => setElephantState("idle"), 2000);
 }
 
 function setupElephantInteraction() {
     const el = document.getElementById("chat-elephant");
     if (!el) return;
+
+    el.setAttribute("title", `${ELEPHANT_NAME} 🐘`);
+
     let lpTimer = null;
     let startX = 0, startY = 0;
 
@@ -2075,6 +2160,12 @@ function setupElephantInteraction() {
             if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; elephantHandleTap(); }
         });
     });
+
+    el.addEventListener("mouseenter", () => {
+        if (elephantCurrentState === "idle") showElephantBubble(`I'm ${ELEPHANT_NAME}! 🐘`, 2000);
+    });
+
+    scheduleElephantIdleSpeech();
 }
 
 // ============================================================================
@@ -2525,15 +2616,40 @@ function renderMessage(message, prepend = false, containerEl = null) {
     if (!containerEl && !isSender && !message.read) state.unreadMessages.add(message.id);
 }
 
+function isSingleEmoji(text) {
+    if (!text || typeof text !== "string") return false;
+    const stripped = text.trim();
+    if (!stripped) return false;
+    try {
+        const segments = [...new Intl.Segmenter("en", { granularity: "grapheme" }).segment(stripped)];
+        if (segments.length !== 1) return false;
+        const char = segments[0].segment;
+        return /\p{Emoji}/u.test(char) && !/^[0-9#*]$/.test(char);
+    } catch {
+        return false;
+    }
+}
+
 // --- Text with link detection + URL preview card ---
 function renderTextContent(bubble, message) {
+    const text = message.text || "";
+
+    if (isSingleEmoji(text)) {
+        bubble.classList.add("solo-emoji");
+        const emojiDiv = document.createElement("div");
+        emojiDiv.className = "solo-emoji-text";
+        emojiDiv.textContent = text.trim();
+        bubble.appendChild(emojiDiv);
+        return;
+    }
+
     const textDiv = document.createElement("div");
-    textDiv.className = `message-text ${isArabic(message.text || "") ? "rtl" : "ltr"}`;
-    renderTextWithLinks(textDiv, message.text || "");
+    textDiv.className = `message-text ${isArabic(text) ? "rtl" : "ltr"}`;
+    renderTextWithLinks(textDiv, text);
     bubble.appendChild(textDiv);
 
     // Link preview card for first URL
-    const url = extractFirstLink(message.text || "");
+    const url = extractFirstLink(text);
     if (url) {
         const card = document.createElement("div");
         card.className = "link-preview";
@@ -2836,12 +2952,14 @@ async function markVisibleMessagesAsRead() {
 // ============================================================================
 
 function showNotification(title, body) {
+    if (localStorage.getItem(CHROME_NOTIF_MUTED_KEY) === "true") return;
     if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, { body });
     }
 }
 
 async function sendTelegramNotification(message) {
+    if (localStorage.getItem(TELEGRAM_MUTED_KEY) === "true") return;
     try {
         await fetch(`https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendMessage`, {
             method: "POST",
@@ -2853,6 +2971,74 @@ async function sendTelegramNotification(message) {
 
 function isMyLove() { return state.currentUserEmail === "ayaessam487@gmail.com"; }
 function myLoveNotify(msg) { if (isMyLove()) sendTelegramNotification(`💕 My Love ${msg}`); }
+
+// ---- CHECKLIST POPUP ----
+function showChecklistReminderPopup() {
+    if (localStorage.getItem(CHECKLIST_POPUP_MUTED_KEY) === "true") return;
+    const popup = document.getElementById("checklist-popup");
+    if (!popup) return;
+    popup.style.display = "flex";
+    // Force reflow so the CSS animation triggers
+    void popup.offsetWidth;
+}
+
+window.closeChecklistPopup = function () {
+    const popup = document.getElementById("checklist-popup");
+    if (popup) popup.style.display = "none";
+};
+
+window.closeTodoModalAndOpen = function () {
+    closeChecklistPopup();
+    openTodoModal();
+};
+
+// ---- NOTIFICATION TOGGLES ----
+window.toggleChecklistPopupMute = function () {
+    const muted = localStorage.getItem(CHECKLIST_POPUP_MUTED_KEY) === "true";
+    localStorage.setItem(CHECKLIST_POPUP_MUTED_KEY, String(!muted));
+    updateMenuMuteStates();
+};
+
+window.toggleTelegramMute = function () {
+    const muted = localStorage.getItem(TELEGRAM_MUTED_KEY) === "true";
+    localStorage.setItem(TELEGRAM_MUTED_KEY, String(!muted));
+    updateMenuMuteStates();
+};
+
+window.toggleChromeNotifMute = function () {
+    const muted = localStorage.getItem(CHROME_NOTIF_MUTED_KEY) === "true";
+    localStorage.setItem(CHROME_NOTIF_MUTED_KEY, String(!muted));
+    updateMenuMuteStates();
+};
+
+function updateMenuMuteStates() {
+    const checklistMuted = localStorage.getItem(CHECKLIST_POPUP_MUTED_KEY) === "true";
+    const btn1 = document.getElementById("checklist-popup-mute-btn");
+    if (btn1) {
+        btn1.querySelector(".header-tool-label").textContent = checklistMuted ? "Checklist popup (muted)" : "Checklist popup";
+        btn1.querySelector(".header-tool-note").textContent = checklistMuted ? "Tap to re-enable" : "Reminder on login";
+        btn1.querySelector(".material-icons").textContent = checklistMuted ? "notifications_off" : "notifications_active";
+        btn1.classList.toggle("tool-muted", checklistMuted);
+    }
+
+    const chromeMuted = localStorage.getItem(CHROME_NOTIF_MUTED_KEY) === "true";
+    const btn2 = document.getElementById("chrome-notif-mute-btn");
+    if (btn2) {
+        btn2.querySelector(".header-tool-label").textContent = chromeMuted ? "Chrome alerts (muted)" : "Chrome alerts";
+        btn2.querySelector(".header-tool-note").textContent = chromeMuted ? "Tap to re-enable" : "Browser notifications";
+        btn2.querySelector(".material-icons").textContent = chromeMuted ? "notifications_off" : "notifications_active";
+        btn2.classList.toggle("tool-muted", chromeMuted);
+    }
+
+    const telegramMuted = localStorage.getItem(TELEGRAM_MUTED_KEY) === "true";
+    const btn3 = document.getElementById("telegram-mute-btn");
+    if (btn3) {
+        btn3.querySelector(".header-tool-label").textContent = telegramMuted ? "Telegram alerts (muted)" : "Telegram alerts";
+        btn3.querySelector(".header-tool-note").textContent = telegramMuted ? "Tap to re-enable" : "Activity pings to Telegram";
+        btn3.querySelector(".material-icons").textContent = telegramMuted ? "block" : "send";
+        btn3.classList.toggle("tool-muted", telegramMuted);
+    }
+}
 
 // ============================================================================
 // PART 3 — UI HELPERS
@@ -2902,7 +3088,11 @@ function updateConnectionStatus(status) {
     const map = {
         connected: { cls: "connected", label: "Connected" },
         disconnected: { cls: "", label: "Disconnected" },
-        loading: { cls: "", label: "Connecting…" }
+        loading: { cls: "loading", label: "Connecting…" },
+        "uploading-photo": { cls: "loading", label: "Uploading photo…" },
+        "uploading-video": { cls: "loading", label: "Uploading video…" },
+        "sending-voice": { cls: "loading", label: "Sending voice…" },
+        sending: { cls: "loading", label: "Sending…" }
     };
 
     const entry = map[status];
@@ -3759,7 +3949,7 @@ window.confirmImageSend = async function () {
     document.getElementById("preview-images-container").innerHTML = "";
     state.selectedImages = [];
 
-    updateConnectionStatus("loading");
+    updateConnectionStatus("uploading-photo");
 
     try {
         for (const { file } of toSend) {
@@ -3893,7 +4083,7 @@ window.confirmVideoSend = async function () {
 
     document.getElementById("video-preview-modal").style.display = "none";
     document.getElementById("video-view-once-checkbox").checked = false;
-    updateConnectionStatus("loading");
+    updateConnectionStatus("uploading-video");
 
     try {
         const ext = file.name.split(".").pop();
@@ -4202,7 +4392,7 @@ window.sendVoiceRecording = async function () {
 
     if (!blob) return;
 
-    updateConnectionStatus("loading");
+    updateConnectionStatus("sending-voice");
 
     try {
         const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.webm`;
@@ -4459,7 +4649,8 @@ document.addEventListener("DOMContentLoaded", () => {
             { id: "attachment-menu", fn: closeAttachmentMenu },
             { id: "todo-modal", fn: closeTodoModal },
             { id: "search-bar", fn: closeSearch },
-            { id: "add-to-home-modal", fn: () => closeAddToHomeModal() }
+            { id: "add-to-home-modal", fn: () => closeAddToHomeModal() },
+            { id: "checklist-popup", fn: closeChecklistPopup }
         ];
 
         for (const { id, fn } of checks) {
