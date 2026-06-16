@@ -6,7 +6,9 @@ const STATIC = ['/', '/index.html', '/style.css', '/app.js', '/manifest.json', '
 
 self.addEventListener('install', e => {
     e.waitUntil(
-        caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())
+        caches.open(CACHE)
+            .then(c => c.addAll(STATIC).catch(() => {}))
+            .then(() => self.skipWaiting())
     );
 });
 
