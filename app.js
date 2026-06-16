@@ -123,7 +123,10 @@ async function subscribeToWebPush() {
         if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
         if (Notification.permission !== "granted") return;
         if (!CONFIG.vapid.publicKey) return;
-        const reg = await navigator.serviceWorker.ready;
+        const reg = await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((_, rej) => setTimeout(() => rej(new Error("SW timeout")), 5000))
+        ]);
         let sub = await reg.pushManager.getSubscription();
         if (!sub) {
             sub = await reg.pushManager.subscribe({
@@ -266,8 +269,8 @@ window.login = async function () {
             localStorage.setItem(PUSH_DEFAULTS_APPLIED_KEY, "true");
         }
 
-        // Subscribe this device to Web Push so background notifications work
-        await subscribeToWebPush();
+        // Subscribe this device to Web Push — fire-and-forget so it never blocks login
+        subscribeToWebPush();
 
         showChatScreen();
         await updatePresence(true);
