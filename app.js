@@ -135,8 +135,8 @@ async function subscribeToWebPush() {
             });
         }
         await state.supabaseClient.from("push_subscriptions").upsert(
-            { user_email: state.currentUserEmail, subscription: JSON.stringify(sub.toJSON()) },
-            { onConflict: "user_email" }
+            { user_email: state.currentUserEmail, endpoint: sub.endpoint, subscription: JSON.stringify(sub.toJSON()) },
+            { onConflict: "user_email,endpoint" }
         );
     } catch (err) {
         console.warn("Web Push subscribe:", err);

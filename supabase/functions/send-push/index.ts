@@ -28,23 +28,41 @@ serve(async (req) => {
         const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
         const { data, error } = await db
             .from("push_subscriptions")
-            .select("subscription")
-            .eq("user_email", to_email)
-            .maybeSingle();
+            .select("endpoint, subscription")
+            .eq("user_email", to_email);
 
-        if (error || !data?.subscription) {
-            return new Response(JSON.stringify({ error: "No subscription found" }), {
+        if (error || !data?.length) {
+            return new Response(JSON.stringify({ error: "No subscriptions found" }), {
                 status: 404, headers: { ...CORS, "Content-Type": "application/json" }
             });
         }
 
-        const sub = typeof data.subscription === "string"
-            ? JSON.parse(data.subscription)
-            : data.subscription;
+        // Send to all devices, clean up expired subscriptions
+        const staleEndpoints: string[] = [];
+        await Promise.allSettled(
+            data.map(async (row) => {
+                const sub = typeof row.subscription === "string"
+                    ? JSON.parse(row.subscription)
+                    : row.subscription;
+                try {
+                    await webpush.sendNotification(sub, JSON.stringify({ title, body }));
+                } catch (err: any) {
+                    if (err.statusCode === 404 || err.statusCode === 410) {
+                        staleEndpoints.push(row.endpoint);
+                    }
+                }
+            })
+        );
 
-        await webpush.sendNotification(sub, JSON.stringify({ title, body }));
+        // Remove stale subscriptions
+        if (staleEndpoints.length > 0) {
+            await db.from("push_subscriptions")
+                .delete()
+                .eq("user_email", to_email)
+                .in("endpoint", staleEndpoints);
+        }
 
-        return new Response(JSON.stringify({ ok: true }), {
+        return new Response(JSON.stringify({ ok: true, sent: data.length - staleEndpoints.length }), {
             headers: { ...CORS, "Content-Type": "application/json" }
         });
     } catch (err) {
