@@ -26,6 +26,8 @@ self.addEventListener('push', e => {
     e.waitUntil(
         self.registration.showNotification(data.title, {
             body: data.body,
+            icon: '/icon.svg',
+            badge: '/icon.svg',
             tag: 'chat-message',
             renotify: true,
             vibrate: [100, 50, 100]

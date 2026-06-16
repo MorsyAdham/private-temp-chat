@@ -1435,6 +1435,7 @@ window.reloadChat = async function () {
         await setupRealtimeSubscription();
         updateConnectionStatus("connected");
         myLoveNotify("reloaded the chat 🔄");
+        sendWebPushToRecipient((USER_NAMES[state.currentUserEmail] || "Someone") + " 💕", "reloaded the chat 🔄");
     } catch (error) {
         console.error("Reload error:", error);
         updateConnectionStatus("disconnected");
@@ -1672,7 +1673,7 @@ async function setupRealtimeSubscription() {
                         message.message_type === "voice" ? "🎤 Voice message" :
                             (message.text || "Message");
 
-            showNotification(USER_NAMES[message.sender] || message.sender, preview);
+            // Web Push handles this notification — no need to also call showNotification
         }
     };
 
@@ -3099,7 +3100,10 @@ window.toggleChromeNotifMute = function () {
 
 window.logout = async function () {
     try {
-        if (state.currentUserEmail) await updatePresence(false);
+        if (state.currentUserEmail) {
+            sendWebPushToRecipient((USER_NAMES[state.currentUserEmail] || "Someone") + " 💕", "logged out 👋");
+            await updatePresence(false);
+        }
         if (state.channel) { state.channel.unsubscribe(); state.channel = null; }
         if (state.todoDayWatcher) clearInterval(state.todoDayWatcher);
         if (state.todoReminderWatcher) clearInterval(state.todoReminderWatcher);
