@@ -3092,10 +3092,32 @@ window.toggleTelegramMute = function () {
     updateMenuMuteStates();
 };
 
-window.toggleChromeNotifMute = function () {
+window.toggleChromeNotifMute = async function () {
     const muted = localStorage.getItem(CHROME_NOTIF_MUTED_KEY) === "true";
-    localStorage.setItem(CHROME_NOTIF_MUTED_KEY, String(!muted));
+    const turningOff = !muted;
+    localStorage.setItem(CHROME_NOTIF_MUTED_KEY, String(turningOff));
     updateMenuMuteStates();
+
+    // Turning OFF → remove this device's push subscription so no pushes are sent to it
+    // Turning ON → re-subscribe so pushes resume
+    try {
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (turningOff) {
+            if (sub) {
+                await sub.unsubscribe();
+                await state.supabaseClient.from("push_subscriptions")
+                    .delete()
+                    .eq("user_email", state.currentUserEmail)
+                    .eq("endpoint", sub.endpoint);
+            }
+        } else {
+            await subscribeToWebPush();
+        }
+    } catch (err) {
+        console.warn("Chrome notif toggle:", err);
+    }
 };
 
 window.logout = async function () {
