@@ -276,6 +276,7 @@ window.login = async function () {
         await updatePresence(true);
 
         myLoveNotify("logged in 🔑");
+        sendWebPushToRecipient((USER_NAMES[state.currentUserEmail] || "Someone") + " 💕", "just logged in 🔑");
 
         updateMenuMuteStates();
         if (isNobody()) {
@@ -2535,6 +2536,10 @@ async function toggleMessageReaction(messageId, emoji) {
 
         const actionText = hadUserReaction ? "removed" : "reacted";
         myLoveNotify(`${actionText} ${emoji} to ${getReactionMessagePreview(message)}`);
+        sendWebPushToRecipient(
+            (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
+            `${actionText} ${emoji} to your message`
+        );
     } catch (error) {
         console.error("Reaction update error:", error);
         if (isReactionColumnUnavailableError(error)) {
@@ -3971,6 +3976,10 @@ window.toggleTodoItem = async function (itemId) {
     }
 
     if (!wasDone && entry.done) {
+        sendWebPushToRecipient(
+            "My Love 💕",
+            `checked off "${templateItem?.text || "a task"}" ✅`
+        );
         await refreshTodoScoreboard();
         await announceTodoEncouragement(templateItem, getTodoMetrics(state.todoToday));
     }
@@ -4143,6 +4152,10 @@ window.openImageViewer = async function (messageId, imagePath, viewOnce, viewedB
             }
 
             myLoveNotify(`opened ${USER_NAMES[senderEmail] || senderEmail}'s view-once photo 👀`);
+            sendWebPushToRecipient(
+                (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
+                "opened your view-once photo 👀"
+            );
         }
     } catch (err) {
         console.error("openImageViewer:", err);
@@ -4281,10 +4294,18 @@ window.openVideoViewer = async function (messageId, videoPath, viewOnce, viewedB
             }
 
             myLoveNotify(`opened ${USER_NAMES[senderEmail] || senderEmail}'s view-once video 👀`);
+            sendWebPushToRecipient(
+                (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
+                "opened your view-once video 👀"
+            );
             return;
         }
 
         myLoveNotify("opened a video 🎬");
+        sendWebPushToRecipient(
+            (USER_NAMES[state.currentUserEmail] || "Someone") + " 💕",
+            "opened a video 🎬"
+        );
     } catch (err) {
         console.error("openVideoViewer:", err);
         showAlert("Failed to load video");
