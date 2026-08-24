@@ -236,11 +236,10 @@ function updateMessageCountNote() {
     const note = document.getElementById("msg-count-note");
     if (!note) return;
     const loaded = state.allMessages.length;
-    if (!state.hasMoreMessages) {
-        note.textContent = `All ${loaded} messages loaded`;
-    } else {
-        note.textContent = `${loaded} loaded · tap to load all`;
-    }
+    note.textContent = String(loaded);
+    note.title = state.hasMoreMessages
+        ? `${loaded} messages loaded — scroll up for more`
+        : `All ${loaded} messages loaded`;
 }
 
 // loadAllFromMenu removed — use jumpToDateFromMenu instead.
@@ -288,43 +287,88 @@ function setupScrollHandler() {
 // PART 2 — REALTIME SUBSCRIPTION
 // ============================================================================
 
+async function handleIncomingMessage(message) {
+    if (!message || !message.id) return;
+    const todoRecord = extractTodoRecordFromMessage(message);
+    if (todoRecord) {
+        saveTodoRecord(todoRecord);
+        renderTodoModal();
+        return;
+    }
+
+    if (state.allMessages.some(m => m.id === message.id)) return;
+
+    state.allMessages.push(message);
+    renderMessage(message, false);
+
+    if (state.isAtBottom) scrollToBottom(true);
+
+    if (message.sender !== state.currentUserEmail) {
+        hideTypingIndicator();
+        elephantOnMessageReceived();
+        if (state.isAtBottom) await markMessageAsRead(message.id);
+
+        const preview =
+            message.message_type === "image" ? "📷 Photo" :
+                message.message_type === "video" ? "🎥 Video" :
+                    message.message_type === "voice" ? "🎤 Voice message" :
+                        (message.text || "Message");
+
+        announceForScreenReader(`${USER_NAMES[message.sender] || "New message"}: ${preview}`);
+
+        // Web Push handles this notification — no need to also call showNotification
+    }
+}
+
+// Fetches anything inserted after the newest message we already have. This is the
+// self-healing counterpart to the live broadcast/postgres_changes subscriptions below:
+// those only deliver events while the socket is actively connected, so a message sent
+// during a brief network drop is otherwise invisible until a manual reload re-fetches
+// everything. Called whenever the channel (re)subscribes, the tab regains focus, or the
+// browser comes back online.
+async function syncMissedMessages() {
+    if (!state.supabaseClient || !state.allMessages.length) return;
+    const newest = state.allMessages[state.allMessages.length - 1];
+    if (!newest?.created_at) return;
+
+    try {
+        const { data, error } = await state.supabaseClient
+            .from("chat_messages")
+            .select("*")
+            .gt("created_at", newest.created_at)
+            .order("created_at", { ascending: true })
+            .limit(200);
+        if (error) throw error;
+        if (!data || !data.length) return;
+
+        for (const message of filterVisibleMessages(data)) {
+            await handleIncomingMessage(message);
+        }
+    } catch (err) {
+        console.warn("syncMissedMessages:", err);
+    }
+}
+
+let realtimeReconnectTimer = null;
+
+async function resubscribeRealtime() {
+    try {
+        if (state.channel) {
+            try { await state.channel.unsubscribe(); } catch (_) {}
+            state.channel = null;
+        }
+        await setupRealtimeSubscription();
+    } catch (err) {
+        console.warn("Realtime resubscribe failed:", err);
+    }
+}
+
 async function setupRealtimeSubscription() {
     state.channel = state.supabaseClient.channel("private-room", {
         config: { broadcast: { self: false } }
     });
 
-    const handleNewMessage = async (message) => {
-        if (!message || !message.id) return;
-        const todoRecord = extractTodoRecordFromMessage(message);
-        if (todoRecord) {
-            saveTodoRecord(todoRecord);
-            renderTodoModal();
-            return;
-        }
-
-        if (state.allMessages.some(m => m.id === message.id)) return;
-
-        state.allMessages.push(message);
-        renderMessage(message, false);
-
-        if (state.isAtBottom) scrollToBottom(true);
-
-        if (message.sender !== state.currentUserEmail) {
-            hideTypingIndicator();
-            elephantOnMessageReceived();
-            if (state.isAtBottom) await markMessageAsRead(message.id);
-
-            const preview =
-                message.message_type === "image" ? "📷 Photo" :
-                    message.message_type === "video" ? "🎥 Video" :
-                        message.message_type === "voice" ? "🎤 Voice message" :
-                            (message.text || "Message");
-
-            announceForScreenReader(`${USER_NAMES[message.sender] || "New message"}: ${preview}`);
-
-            // Web Push handles this notification — no need to also call showNotification
-        }
-    };
+    const handleNewMessage = handleIncomingMessage;
 
     state.channel.on("broadcast", { event: "new-message" }, (p) => handleNewMessage(p.payload));
     state.channel.on("broadcast", { event: "reaction-updated" }, (p) => applyMessageUpdate(p.payload));
@@ -401,8 +445,19 @@ async function setupRealtimeSubscription() {
     }
 
     await state.channel.subscribe((status) => {
-        if (status === "SUBSCRIBED") updateConnectionStatus("connected");
-        else if (status === "CLOSED" || status === "CHANNEL_ERROR") updateConnectionStatus("disconnected");
+        if (status === "SUBSCRIBED") {
+            updateConnectionStatus("connected");
+            clearTimeout(realtimeReconnectTimer);
+            // Catches up on anything sent while this device was disconnected — including
+            // the very first subscribe, which is a harmless no-op since there's nothing newer yet.
+            syncMissedMessages();
+        } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            updateConnectionStatus("disconnected");
+            clearTimeout(realtimeReconnectTimer);
+            realtimeReconnectTimer = setTimeout(() => {
+                if (state.currentUserEmail) resubscribeRealtime();
+            }, 3000);
+        }
     });
 }
 

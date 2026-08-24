@@ -116,7 +116,7 @@ window.addEventListener("beforeinstallprompt", (e) => {
     deferredInstallPrompt = e;
     // Update button note to signal it's ready to install
     const note = document.getElementById("add-home-note");
-    if (note) note.textContent = "Tap to install instantly";
+    if (note) note.textContent = "Ready";
     const icon = document.getElementById("add-home-icon");
     if (icon) icon.textContent = "download";
 });
@@ -124,7 +124,7 @@ window.addEventListener("beforeinstallprompt", (e) => {
 window.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
     const note = document.getElementById("add-home-note");
-    if (note) note.textContent = "App installed ✓";
+    if (note) note.textContent = "Installed";
     const icon = document.getElementById("add-home-icon");
     if (icon) icon.textContent = "check_circle";
 });

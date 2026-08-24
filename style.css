@@ -978,23 +978,27 @@ body.menu-sheet-open {
 
 .notif-test-btn {
   flex: 0 0 auto;
-  padding: 6px 11px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.05);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.notif-test-btn .material-symbols-outlined {
+  font-size: 16px;
 }
 
 .notif-test-btn:hover {
   background: var(--hover);
-  color: var(--text-primary);
-  border-color: var(--primary);
+  color: var(--primary);
 }
 
 /* iOS-style toggle switch, used for all notification on/off controls */
@@ -1099,59 +1103,55 @@ body.menu-sheet-open {
   text-decoration: none;
 }
 
-/* Stacked variant: label row on top, control full-width below */
-.header-tool-item--stacked {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-  cursor: default;
-}
-
-.header-tool-item--stacked:hover {
-  transform: none;
-  box-shadow: none;
-}
-
-.header-tool-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-/* Full-width control (date input, select) inside stacked items */
-.tool-control-full {
-  width: 100%;
-  box-sizing: border-box;
-}
-
 .header-tool-bubble {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
+  width: 20px;
+  flex: 0 0 20px;
   font-size: 18px;
   color: var(--text-secondary);
 }
 
-.header-tool-bubble .material-symbols-outlined {
-  font-size: 20px;
-}
-
-.header-tool-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-  gap: 2px;
-}
-
 .header-tool-label {
-  font-size: 13px;
-  font-weight: 700;
+  flex: 1 1 auto;
+  flex-shrink: 0;
+  font-size: 13.5px;
+  font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
+}
+
+/* Small right-aligned status text (e.g. a loaded-message count, install state) —
+   replaces the old two-line description under every label with an inline value
+   instead. Shrinks/truncates before the label ever does. */
+.header-tool-hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+/* Compact sizing for controls (date picker, theme select) that sit at the end of a
+   menu row instead of stacked full-width below it — layered on top of their base
+   .jump-date-input / .theme-select styling (color-scheme, custom arrow, etc). */
+.menu-inline-input,
+.menu-inline-select {
+  flex: 0 0 auto;
+  max-width: 132px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+select.menu-inline-select {
+  padding-right: 26px;
+  background-position:
+    calc(100% - 13px) calc(50% - 2px),
+    calc(100% - 8px) calc(50% - 2px);
 }
 
 .header-tool-note {

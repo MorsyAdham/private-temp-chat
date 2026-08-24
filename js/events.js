@@ -84,6 +84,18 @@ document.addEventListener("DOMContentLoaded", () => {
         updateAppViewButton();
     });
 
+    // Realtime self-healing: a dropped connection (phone locked, wifi blip, laptop sleep)
+    // otherwise leaves this device silently missing messages until someone hits Reload.
+    window.addEventListener("online", () => {
+        if (state.currentUserEmail) resubscribeRealtime();
+    });
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && state.currentUserEmail) {
+            syncMissedMessages();
+        }
+    });
+
     window.addEventListener("resize", syncViewportLayout);
 
     if (window.visualViewport) {
