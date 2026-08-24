@@ -1,9 +1,9 @@
 // Service worker — enables PWA install prompt on Android Chrome
 // Stale-while-revalidate for app files: cached response served instantly,
 // then refreshed from the network in the background for the next load.
-const CACHE = 'our-room-v15';
+const CACHE = 'our-room-v16';
 const STATIC = [
-    '/', '/index.html', '/style.css', '/manifest.json', '/icon.svg',
+    '/', '/index.html', '/style.css', '/manifest.json', '/icon.svg', '/icon-192.png', '/icon-512.png',
     '/js/config.js', '/js/auth.js', '/js/utils.js', '/js/chat-core.js', '/js/render.js',
     '/js/receipts-notifications.js', '/js/ui-todo.js', '/js/media.js', '/js/theme-pwa.js', '/js/events.js'
 ];
@@ -30,8 +30,10 @@ self.addEventListener('push', e => {
     e.waitUntil(
         self.registration.showNotification(data.title, {
             body: data.body,
-            icon: '/icon.svg',
-            badge: '/icon.svg',
+            // SVG icons are unreliable for the Notification API (Chrome/Android often
+            // silently fail to render them and fall back to a generic bell) — use PNGs.
+            icon: '/icon-512.png',
+            badge: '/icon-192.png',
             tag: 'chat-message',
             renotify: true,
             vibrate: [100, 50, 100]

@@ -38,12 +38,12 @@ async function showNotification(title, body) {
         if ("serviceWorker" in navigator) {
             const reg = await navigator.serviceWorker.getRegistration();
             if (reg) {
-                reg.showNotification(title, { body, vibrate: [100, 50, 100] });
+                reg.showNotification(title, { body, icon: "/icon-512.png", badge: "/icon-192.png", vibrate: [100, 50, 100] });
                 return;
             }
         }
     } catch (_) {}
-    new Notification(title, { body });
+    new Notification(title, { body, icon: "/icon-512.png" });
 }
 
 async function sendTelegramNotification(title, body = "") {
@@ -179,11 +179,11 @@ window.testChromeNotification = async function () {
         if ("serviceWorker" in navigator) {
             const reg = await navigator.serviceWorker.getRegistration();
             if (reg) {
-                reg.showNotification("💕 Test alert", { body: "This is what your in-app alerts look like!", vibrate: [100, 50, 100] });
+                reg.showNotification("💕 Test alert", { body: "This is what your in-app alerts look like!", icon: "/icon-512.png", badge: "/icon-192.png", vibrate: [100, 50, 100] });
                 shown = true;
             }
         }
-        if (!shown) new Notification("💕 Test alert", { body: "This is what your in-app alerts look like!" });
+        if (!shown) new Notification("💕 Test alert", { body: "This is what your in-app alerts look like!", icon: "/icon-512.png" });
 
         // Background push round-trip, so it can be confirmed with the app closed too.
         if (CONFIG.vapid.publicKey && "serviceWorker" in navigator && "PushManager" in window) {

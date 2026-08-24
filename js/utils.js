@@ -723,7 +723,20 @@ function applyTheme(themeName) {
     document.body.dataset.theme = theme;
     localStorage.setItem(THEME_STORAGE_KEY, theme);
     updateThemeControls();
+    updateStatusBarColor();
 };
+
+// Keeps the OS status bar (installed PWA) / browser toolbar color in sync with the
+// active theme instead of staying stuck on whatever color was set at install time.
+function updateStatusBarColor() {
+    // Read the value straight from CSS so this never drifts out of sync with the
+    // theme palettes defined there.
+    const color = getComputedStyle(document.body).getPropertyValue("--dark-bg").trim();
+    if (!color) return;
+    document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
+        meta.setAttribute("content", color);
+    });
+}
 
 window.setThemeFromMenu = function (themeName) {
     applyTheme(themeName);
