@@ -106,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.addEventListener("click", (event) => {
-        if (!event.target.closest(".header-tools")) {
+        if (!event.target.closest(".header-tools, .header-tools-menu")) {
             setHeaderToolsOpen(false);
         }
         if (!event.target.closest(".attachment-dock")) {

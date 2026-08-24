@@ -137,14 +137,82 @@ window.logout = async function () {
     window.location.reload();
 };
 
+function setToggleSwitchState(id, isOn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle("is-on", isOn);
+    el.setAttribute("aria-checked", isOn ? "true" : "false");
+}
+
 function updateMenuMuteStates() {
     const checklistMuted = localStorage.getItem(CHECKLIST_POPUP_MUTED_KEY) === "true";
-    document.getElementById("checklist-popup-mute-btn")?.classList.toggle("tool-muted", checklistMuted);
+    setToggleSwitchState("checklist-popup-mute-btn", !checklistMuted);
 
     const chromeMuted = localStorage.getItem(CHROME_NOTIF_MUTED_KEY) === "true";
-    document.getElementById("chrome-notif-mute-btn")?.classList.toggle("tool-muted", chromeMuted);
+    setToggleSwitchState("chrome-notif-mute-btn", !chromeMuted);
 
     const telegramMuted = localStorage.getItem(TELEGRAM_MUTED_KEY) === "true";
-    document.getElementById("telegram-mute-btn")?.classList.toggle("tool-muted", telegramMuted);
+    setToggleSwitchState("telegram-mute-btn", !telegramMuted);
 }
+
+// ---- NOTIFICATION TESTS ----
+window.testChromeNotification = async function () {
+    try {
+        if (!("Notification" in window)) {
+            showAlert("This browser doesn't support notifications.");
+            return;
+        }
+        if (Notification.permission === "denied") {
+            showAlert("Notifications are blocked for this site in your browser settings.");
+            return;
+        }
+        if (Notification.permission === "default") {
+            const result = await Notification.requestPermission();
+            if (result !== "granted") {
+                showAlert("Notification permission wasn't granted.");
+                return;
+            }
+        }
+
+        // Foreground preview, right now.
+        let shown = false;
+        if ("serviceWorker" in navigator) {
+            const reg = await navigator.serviceWorker.getRegistration();
+            if (reg) {
+                reg.showNotification("💕 Test alert", { body: "This is what your in-app alerts look like!", vibrate: [100, 50, 100] });
+                shown = true;
+            }
+        }
+        if (!shown) new Notification("💕 Test alert", { body: "This is what your in-app alerts look like!" });
+
+        // Background push round-trip, so it can be confirmed with the app closed too.
+        if (CONFIG.vapid.publicKey && "serviceWorker" in navigator && "PushManager" in window) {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) {
+                await state.supabaseClient.functions.invoke("send-push", {
+                    body: { to_email: state.currentUserEmail, title: "💕 Test push", body: "Background push is working!" }
+                });
+            }
+        }
+
+        showAlert("Test alert sent 💕");
+    } catch (err) {
+        console.error("Test notification:", err);
+        showAlert("Couldn't send a test alert.");
+    }
+};
+
+window.testTelegramNotification = async function () {
+    try {
+        const { error } = await state.supabaseClient.functions.invoke("send-telegram", {
+            body: { title: "💕 Test ping", body: "This is a test from Just the Two of Us." }
+        });
+        if (error) throw error;
+        showAlert("Test Telegram message sent 💕");
+    } catch (err) {
+        console.error("Test Telegram:", err);
+        showAlert("Couldn't send a test Telegram message.");
+    }
+};
 

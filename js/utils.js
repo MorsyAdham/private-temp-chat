@@ -698,11 +698,17 @@ function updateThemeControls() {
 function setHeaderToolsOpen(isOpen) {
     state.headerToolsOpen = Boolean(isOpen);
     const menu = document.getElementById("header-tools-menu");
+    const backdrop = document.getElementById("header-tools-backdrop");
     const button = document.getElementById("tools-toggle-btn");
-    if (menu) menu.style.display = state.headerToolsOpen ? "flex" : "none";
+    if (menu) {
+        menu.style.display = state.headerToolsOpen ? "flex" : "none";
+        menu.classList.toggle("header-tools-menu--open", state.headerToolsOpen);
+    }
+    if (backdrop) backdrop.style.display = state.headerToolsOpen ? "block" : "none";
+    document.body.classList.toggle("menu-sheet-open", state.headerToolsOpen);
     if (button) {
         button.setAttribute("aria-expanded", state.headerToolsOpen ? "true" : "false");
-        button.title = state.headerToolsOpen ? "Close tools" : "More tools";
+        button.title = state.headerToolsOpen ? "Close menu" : "Menu";
     }
 }
 

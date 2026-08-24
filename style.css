@@ -168,6 +168,15 @@ body[data-theme="cute"] .header-tool-item:hover {
   border-color: rgba(210, 80, 124, 0.16);
 }
 
+body[data-theme="cute"] .notif-row {
+  background: transparent;
+  border-color: rgba(210, 80, 124, 0.1);
+}
+
+body[data-theme="cute"] .toggle-switch {
+  background: rgba(210, 80, 124, 0.18);
+}
+
 /* ── Theme select ── */
 body[data-theme="cute"] .theme-select {
   background: rgba(255, 255, 255, 0.9);
@@ -327,6 +336,11 @@ body[data-theme="ink"] .header-tools-menu {
 
 body[data-theme="ink"] .header-tool-item:hover {
   background: rgba(255,255,255,0.05);
+}
+
+body[data-theme="ink"] .notif-row {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
 }
 
 body[data-theme="ink"] .todo-modal {
@@ -839,15 +853,29 @@ input:focus { border-color: var(--primary); }
   position: relative;
 }
 
+.header-tools-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  animation: popup-fadein 0.2s ease-out;
+}
+
+body.menu-sheet-open {
+  overflow: hidden;
+}
+
+/* Desktop/tablet: dropdown card under the menu button */
 .header-tools-menu {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  width: 310px;
+  position: fixed;
+  top: 68px;
+  right: 16px;
+  width: 320px;
+  max-height: min(72vh, 620px);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px;
+  padding: 10px 0;
   border-radius: 22px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
@@ -856,6 +884,24 @@ input:focus { border-color: var(--primary); }
   box-shadow: var(--surface-shadow);
   backdrop-filter: blur(18px);
   z-index: 40;
+  animation: menu-pop-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes menu-pop-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.menu-grabber {
+  display: none;
+}
+
+.menu-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px;
+  overflow-y: auto;
 }
 
 /* Divider between menu groups */
@@ -879,62 +925,92 @@ input:focus { border-color: var(--primary); }
   user-select: none;
 }
 
-/* Compact notification toggle row */
-.notif-toggles-row {
+/* Notification row: icon + label/note + optional Test button + toggle switch */
+.notif-row {
   display: flex;
-  gap: 7px;
-  padding: 2px 0;
-}
-
-.notif-toggle-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 10px 6px 9px;
-  border: 1.5px solid var(--primary);
-  border-radius: 14px;
-  background: rgba(255,255,255,0.06);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  position: relative;
-  min-height: 62px;
-}
-
-.notif-toggle-btn:hover {
-  background: rgba(255,255,255,0.12);
-  transform: translateY(-1px);
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(13, 9, 16, 0.18);
 }
 
 .notif-toggle-icon {
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
 }
 
 .notif-tg-svg,
 .notif-logo-svg {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   display: block;
   border-radius: 50%;
   overflow: hidden;
 }
 
-.notif-toggle-label {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-  text-transform: uppercase;
+.notif-row .header-tool-note {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
-.notif-toggle-btn.tool-muted {
-  opacity: 0.38;
-  filter: grayscale(0.6);
-  border-color: rgba(255,255,255,0.12);
+.notif-test-btn {
+  flex: 0 0 auto;
+  padding: 6px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.notif-test-btn:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+  border-color: var(--primary);
+}
+
+/* iOS-style toggle switch, used for all notification on/off controls */
+.toggle-switch {
+  flex: 0 0 auto;
+  position: relative;
+  width: 42px;
+  height: 25px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s ease;
+}
+
+.toggle-switch .toggle-knob {
+  position: absolute;
+  top: 2.5px;
+  left: 2.5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.toggle-switch.is-on {
+  background: var(--primary);
+}
+
+.toggle-switch.is-on .toggle-knob {
+  transform: translateX(17px);
 }
 
 /* Logout button in header */
@@ -1032,6 +1108,37 @@ input:focus { border-color: var(--primary); }
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
     var(--hover);
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+.header-tool-item--danger .header-tool-label {
+  color: #ff6b81;
+}
+
+.header-tool-item--danger .header-tool-bubble {
+  background: rgba(255, 107, 129, 0.12);
+  border-color: rgba(255, 107, 129, 0.18);
+}
+
+.header-tool-item--danger:hover {
+  border-color: rgba(255, 107, 129, 0.3);
+}
+
+/* Small inline action button used inside a stacked header-tool-item (e.g. Reload) */
+.menu-inline-btn {
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.menu-inline-btn:hover {
+  background: var(--hover);
+  border-color: var(--primary);
 }
 
 /* Legacy — no longer used but kept for safety */
@@ -1513,6 +1620,28 @@ body[data-theme="classic"] .jump-date-input {
   gap: 8px;
   position: relative;
   background: var(--chat-bg);
+  z-index: 0;
+}
+
+/* Playful doodle texture behind the messages — hearts, a star, a paw print, a swoosh.
+   Uses a CSS mask so the doodle automatically tints to each theme's --text-secondary,
+   instead of needing a separate hardcoded SVG per theme. */
+.messages-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.07;
+  background-color: var(--text-secondary);
+  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'><g fill='none' stroke='%23000' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'><path transform='translate(20,30) scale(0.7)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(150,150) scale(0.55)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(170,20)' d='M12 0l3 8 8 1-6 6 1 8-9-5-9 5 1-8-6-6 8-1z'/><g transform='translate(90,150)'><ellipse cx='0' cy='10' rx='11' ry='8'/><circle cx='-11' cy='-6' r='4'/><circle cx='0' cy='-10' r='4'/><circle cx='11' cy='-6' r='4'/></g><path d='M150 200q10-12 20 0'/><path d='M40 180l6 6M46 180l-6 6'/><circle cx='200' cy='90' r='3'/><circle cx='30' cy='110' r='3'/><circle cx='110' cy='30' r='3'/></g></svg>");
+  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'><g fill='none' stroke='%23000' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'><path transform='translate(20,30) scale(0.7)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(150,150) scale(0.55)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(170,20)' d='M12 0l3 8 8 1-6 6 1 8-9-5-9 5 1-8-6-6 8-1z'/><g transform='translate(90,150)'><ellipse cx='0' cy='10' rx='11' ry='8'/><circle cx='-11' cy='-6' r='4'/><circle cx='0' cy='-10' r='4'/><circle cx='11' cy='-6' r='4'/></g><path d='M150 200q10-12 20 0'/><path d='M40 180l6 6M46 180l-6 6'/><circle cx='200' cy='90' r='3'/><circle cx='30' cy='110' r='3'/><circle cx='110' cy='30' r='3'/></g></svg>");
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  -webkit-mask-size: 220px 220px;
+  mask-size: 220px 220px;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
 }
 
 body.app-view-enabled .messages-container {
@@ -3647,6 +3776,35 @@ body[data-theme="cute"] .attachment-rail-option:hover {
   .message-image,
   .message-video {
     max-width: 240px;
+  }
+
+  /* Menu becomes a bottom sheet instead of a top-right dropdown */
+  .header-tools-menu {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: 82vh;
+    border-radius: 26px 26px 0 0;
+    padding-top: 8px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    animation: sheet-slide-up 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes sheet-slide-up {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  .menu-grabber {
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border);
+    margin: 0 auto 8px;
+    flex: 0 0 auto;
   }
 }
 

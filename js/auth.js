@@ -51,8 +51,8 @@ window.login = async function () {
 
         updateMenuMuteStates();
         if (isNobody()) {
-            const telegramBtn = document.getElementById("telegram-mute-btn");
-            if (telegramBtn) telegramBtn.style.display = "";
+            const telegramRow = document.getElementById("telegram-notif-row");
+            if (telegramRow) telegramRow.style.display = "flex";
         }
 
         await initializeDailyTodo();
