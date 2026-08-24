@@ -1,8 +1,12 @@
 // Service worker — enables PWA install prompt on Android Chrome
 // Stale-while-revalidate for app files: cached response served instantly,
 // then refreshed from the network in the background for the next load.
-const CACHE = 'our-room-v8';
-const STATIC = ['/', '/index.html', '/style.css', '/app.js', '/manifest.json', '/icon.svg'];
+const CACHE = 'our-room-v9';
+const STATIC = [
+    '/', '/index.html', '/style.css', '/manifest.json', '/icon.svg',
+    '/js/config.js', '/js/auth.js', '/js/utils.js', '/js/chat-core.js', '/js/render.js',
+    '/js/receipts-notifications.js', '/js/ui-todo.js', '/js/media.js', '/js/theme-pwa.js', '/js/events.js'
+];
 
 self.addEventListener('install', e => {
     e.waitUntil(

@@ -5,10 +5,26 @@ This repository is a small static web app. Keep the structure flat unless there 
 
 - `index.html`: page structure, modal markup, and external CDN includes.
 - `style.css`: all visual styling, layout, and responsive rules.
-- `app.js`: application logic, Supabase auth/realtime/storage flows, UI state, and DOM event handlers.
+- `js/`: application logic, split into focused files loaded in order by `index.html`. Each
+  file relies on globals defined by the ones before it — there are no ES module imports/exports,
+  it's plain scripts sharing one global scope, same as the original single `app.js` did.
+  - `config.js` — config constants, `USER_NAMES`, themes list, todo/category constants
+  - `auth.js` — app bootstrap: Supabase client init, auth state listener, login/logout
+  - `utils.js` — shared utility functions: formatting, DOM helpers, web push, escaping, etc.
+  - `chat-core.js` — chat load/pagination, realtime subscription, search, reply, sending text
+  - `render.js` — message rendering, typing indicator, elephant companion, message context menu
+  - `receipts-notifications.js` — read receipts and in-app/push/Telegram notifications
+  - `ui-todo.js` — general UI helpers plus the daily checklist / todo-list feature
+  - `media.js` — attachment menu, image handling, video handling, voice recording
+  - `theme-pwa.js` — dynamic CSS injection for newer features, and Add-to-Home-Screen flow
+  - `events.js` — top-level `DOMContentLoaded` / global event listener wiring (must load last)
+- `supabase/functions/`: Edge Functions that hold secrets the client must never see directly
+  (`send-push`, `send-telegram`) — both require the caller to be an authenticated, allow-listed user.
 - `*.png`, `*.jpg`: local media assets used by the UI.
 
-If the codebase grows, prefer moving new logic into focused files such as `js/chat.js` or `css/components.css` instead of expanding `app.js` indefinitely.
+Keep new logic in the right existing `js/` file by feature area; only add a new file for a
+genuinely new feature area, and wire it into `index.html`'s script list (and `sw.js`'s `STATIC`
+precache list) in the right load-order position.
 
 ## Build, Test, and Development Commands
 There is no package-managed build step in this repository. Development is done by serving the files locally in a browser.
