@@ -65,7 +65,7 @@ window.reloadChat = async function () {
         spinner.id = "load-more-spinner";
         spinner.className = "load-more-spinner";
         spinner.style.display = "none";
-        spinner.innerHTML = '<span class="material-icons spin-icon">autorenew</span>';
+        spinner.innerHTML = '<span class="material-symbols-outlined spin-icon">autorenew</span>';
         messagesDiv.appendChild(spinner);
 
         state.oldestMessageTimestamp = null;

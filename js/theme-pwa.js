@@ -54,7 +54,7 @@ function injectDynamicStyles() {
       transition: background 0.2s, color 0.2s;
       z-index: 5;
     }
-    .msg-reply-btn .material-icons { font-size: 18px; }
+    .msg-reply-btn .material-symbols-outlined { font-size: 18px; }
     .message-bubble.sender  .msg-reply-btn { left: -42px; }
     .message-bubble.receiver .msg-reply-btn { right: -42px; }
     .message-bubble:hover .msg-reply-btn { display: flex; }

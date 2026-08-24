@@ -80,7 +80,7 @@ body[data-theme="cute"] .header-mini-stat strong {
   color: var(--primary);
 }
 
-body[data-theme="cute"] .header-mini-stat .material-icons,
+body[data-theme="cute"] .header-mini-stat .material-symbols-outlined,
 body[data-theme="cute"] .header-actions .header-bubble-btn.todo {
   color: var(--primary);
 }
@@ -158,19 +158,12 @@ body[data-theme="cute"] .header-tool-item {
 }
 
 body[data-theme="cute"] .header-tool-bubble {
-  background: rgba(214, 64, 110, 0.1);
-  border-color: rgba(210, 80, 124, 0.14);
   color: var(--primary);
 }
 
 body[data-theme="cute"] .header-tool-item:hover {
   background: rgba(214, 64, 110, 0.06);
   border-color: rgba(210, 80, 124, 0.16);
-}
-
-body[data-theme="cute"] .notif-row {
-  background: transparent;
-  border-color: rgba(210, 80, 124, 0.1);
 }
 
 body[data-theme="cute"] .toggle-switch {
@@ -205,7 +198,7 @@ body[data-theme="cute"] .todo-editor-note {
 
 body[data-theme="cute"] .todo-item.completed,
 body[data-theme="cute"] .todo-category-tab.active {
-  background: linear-gradient(135deg, rgba(214, 64, 110, 0.1), rgba(160, 107, 192, 0.08));
+  background: var(--accent-glow);
 }
 
 body[data-theme="cute"] .todo-kicker {
@@ -224,7 +217,7 @@ body[data-theme="cute"] .msg-context-option {
   color: var(--text-primary);
 }
 
-body[data-theme="cute"] .msg-context-option .material-icons {
+body[data-theme="cute"] .msg-context-option .material-symbols-outlined {
   color: var(--primary);
 }
 
@@ -298,7 +291,7 @@ body[data-theme="ink"] .header-actions .icon-btn.header-bubble-btn {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 14px rgba(0,0,0,0.4);
 }
 
-body[data-theme="ink"] .header-mini-stat .material-icons,
+body[data-theme="ink"] .header-mini-stat .material-symbols-outlined,
 body[data-theme="ink"] .header-actions .header-bubble-btn.todo {
   color: var(--primary);
 }
@@ -338,11 +331,6 @@ body[data-theme="ink"] .header-tool-item:hover {
   background: rgba(255,255,255,0.05);
 }
 
-body[data-theme="ink"] .notif-row {
-  background: rgba(255,255,255,0.03);
-  border-color: rgba(255,255,255,0.06);
-}
-
 body[data-theme="ink"] .todo-modal {
   background:
     radial-gradient(circle at top right, rgba(30, 60, 100, 0.22), transparent 34%),
@@ -359,7 +347,7 @@ body[data-theme="ink"] .todo-item {
 
 body[data-theme="ink"] .todo-item.completed,
 body[data-theme="ink"] .todo-category-tab.active {
-  background: linear-gradient(135deg, rgba(30, 60, 100, 0.4), rgba(60, 40, 120, 0.25));
+  background: var(--accent-glow);
 }
 
 body[data-theme="ink"] .todo-footer p {
@@ -382,7 +370,7 @@ body[data-theme="classic"] .todo-item {
 
 body[data-theme="classic"] .todo-item.completed,
 body[data-theme="classic"] .todo-category-tab.active {
-  background: rgba(37, 211, 102, 0.12);
+  background: var(--accent-glow);
 }
 
 body[data-theme="classic"] .todo-kicker {
@@ -410,6 +398,15 @@ body {
   min-height: var(--app-height);
   padding: 10px;
   transition: background 0.35s ease, color 0.25s ease;
+}
+
+/* Modern outlined icon set — thin/medium weight, no fill, for a cleaner look than the
+   old default filled Material Icons */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 350, 'GRAD' 0, 'opsz' 24;
+  font-size: 20px;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 body.app-view-enabled {
@@ -734,7 +731,7 @@ body.app-view-enabled .container {
   opacity: 1;
 }
 
-.btn-login .material-icons { font-size: 18px; }
+.btn-login .material-symbols-outlined { font-size: 18px; }
 
 /* Keep old input styles for non-login areas */
 input[type="email"],
@@ -931,10 +928,13 @@ body.menu-sheet-open {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  padding: 10px 8px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.12s ease;
+}
+
+.notif-row:hover {
+  background: var(--hover);
 }
 
 .notif-toggle-icon {
@@ -1069,14 +1069,14 @@ body.menu-sheet-open {
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 11px 14px;
-  border: 1px solid var(--border);
+  padding: 10px 8px;
+  border: none;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
   color: var(--text-primary);
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.12s ease;
   text-decoration: none;
 }
 
@@ -1109,13 +1109,15 @@ body.menu-sheet-open {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
   font-size: 18px;
+  color: var(--text-secondary);
+}
+
+.header-tool-bubble .material-symbols-outlined {
+  font-size: 20px;
 }
 
 .header-tool-copy {
@@ -1143,10 +1145,7 @@ body.menu-sheet-open {
 }
 
 .header-tool-item:hover {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
-    var(--hover);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--hover);
 }
 
 .header-tool-item--danger .header-tool-label {
@@ -1154,8 +1153,7 @@ body.menu-sheet-open {
 }
 
 .header-tool-item--danger .header-tool-bubble {
-  background: rgba(255, 107, 129, 0.12);
-  border-color: rgba(255, 107, 129, 0.18);
+  color: #ff6b81;
 }
 
 .header-tool-item--danger:hover {
@@ -1222,7 +1220,7 @@ body.menu-sheet-open {
   line-height: 1;
 }
 
-.header-mini-stat .material-icons {
+.header-mini-stat .material-symbols-outlined {
   font-size: 18px;
   color: var(--primary);
 }
@@ -1313,7 +1311,7 @@ body.menu-sheet-open {
   color: #ff8fbe;
 }
 
-.header-actions .header-bubble-btn .material-icons {
+.header-actions .header-bubble-btn .material-symbols-outlined {
   font-size: 20px;
 }
 
@@ -1347,7 +1345,7 @@ body.menu-sheet-open {
 }
 
 .header-actions .theme-toggle-emoji,
-.header-actions .material-icons {
+.header-actions .material-symbols-outlined {
   font-size: 21px;
 }
 
@@ -1675,7 +1673,7 @@ body[data-theme="cute"] .messages-container {
 }
 
 body.app-view-enabled .messages-container {
-  background: transparent;
+  background-color: transparent;
 }
 
 .messages-container::-webkit-scrollbar {
@@ -2341,7 +2339,7 @@ body[data-theme="cute"] .system-todo-encouragement {
   min-width: 0;
 }
 
-.reply-content .material-icons {
+.reply-content .material-symbols-outlined {
   color: var(--primary);
   flex-shrink: 0;
 }
@@ -2372,13 +2370,10 @@ body[data-theme="cute"] .system-todo-encouragement {
 .input-area {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
-  padding: 12px 14px 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
-    var(--message-bg);
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--message-bg);
   border-top: 1px solid var(--border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
   position: relative;
   overflow: visible;
 }
@@ -2444,7 +2439,7 @@ body[data-theme="cute"] .system-todo-encouragement {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-.attachment-rail-option .material-icons {
+.attachment-rail-option .material-symbols-outlined {
   font-size: 18px;
   color: var(--primary);
 }
@@ -2485,6 +2480,7 @@ body[data-theme="cute"] .system-todo-encouragement {
 }
 
 .input-area > #send-btn {
+  border-radius: 50%;
   background: var(--primary);
   color: white;
   border-color: transparent;
@@ -2496,15 +2492,19 @@ body[data-theme="cute"] .system-todo-encouragement {
   border-color: transparent;
 }
 
-.input-area > #voice-btn,
+.input-area > #voice-btn {
+  border-radius: 50%;
+  color: var(--primary);
+}
+
 .attachment-dock > #attach-btn {
   color: var(--primary);
 }
 
-.input-area > .icon-btn .material-icons,
-.input-area > #send-btn .material-icons,
-.input-area > #voice-btn .material-icons,
-.attachment-dock > #attach-btn .material-icons {
+.input-area > .icon-btn .material-symbols-outlined,
+.input-area > #send-btn .material-symbols-outlined,
+.input-area > #voice-btn .material-symbols-outlined,
+.attachment-dock > #attach-btn .material-symbols-outlined {
   font-size: 22px;
 }
 
@@ -2703,7 +2703,7 @@ body[data-theme="cute"] .attachment-rail-option:hover {
   color: white;
 }
 
-.recording-animation .material-icons {
+.recording-animation .material-symbols-outlined {
   animation: pulse 1.5s infinite;
 }
 
@@ -2892,7 +2892,7 @@ body[data-theme="cute"] .attachment-rail-option:hover {
   transform: translateY(-2px);
 }
 
-.attachment-option .material-icons {
+.attachment-option .material-symbols-outlined {
   font-size: 32px;
   color: var(--primary);
 }
@@ -2910,12 +2910,9 @@ body[data-theme="cute"] .attachment-rail-option:hover {
 .todo-modal {
   max-width: 520px;
   padding: 22px;
-  background:
-    radial-gradient(circle at top right, rgba(255, 173, 214, 0.22), transparent 34%),
-    radial-gradient(circle at top left, rgba(255, 225, 239, 0.1), transparent 30%),
-    var(--message-bg);
+  background: var(--message-bg);
   border: 1px solid var(--border);
-  box-shadow: var(--panel-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: var(--panel-shadow);
 }
 
 .todo-header {
@@ -2969,7 +2966,7 @@ body[data-theme="cute"] .attachment-rail-option:hover {
   align-items: center;
   min-height: 48px;
   padding: 10px 15px;
-  border-radius: 18px;
+  border-radius: 12px;
   background: var(--hover);
   border: 1px solid var(--border);
   color: var(--text-primary);
@@ -3006,10 +3003,9 @@ body[data-theme="cute"] .attachment-rail-option:hover {
 .todo-summary-panel,
 .todo-body-panel,
 .todo-footer {
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.035));
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
 }
 
 .todo-summary-panel {
@@ -3027,14 +3023,15 @@ body[data-theme="cute"] .attachment-rail-option:hover {
 .todo-stat-card {
   flex: 1 1 0;
   min-width: 0;
-  background: linear-gradient(180deg, rgba(255, 241, 247, 0.09), rgba(255, 241, 247, 0.04));
-  border: 1px solid rgba(255, 214, 232, 0.13);
-  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
   padding: 14px 16px;
 }
 
 .todo-stat-card.accent {
-  background: linear-gradient(135deg, rgba(255, 160, 205, 0.24), rgba(255, 222, 236, 0.08), rgba(37, 211, 102, 0.07));
+  background: rgba(232, 67, 125, 0.1);
+  border-color: var(--accent-glow);
 }
 
 .todo-stat-label {
@@ -3110,7 +3107,7 @@ body[data-theme="cute"] .attachment-rail-option:hover {
   flex: 1;
   min-width: 108px;
   border: none;
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 12px 14px;
   background: transparent;
   color: var(--text-secondary);
@@ -3145,9 +3142,8 @@ body[data-theme="cute"] .attachment-rail-option:hover {
 }
 
 .todo-category-tab.active {
-  background: linear-gradient(135deg, rgba(255, 138, 181, 0.22), rgba(37, 211, 102, 0.18));
-  color: #fff1f7;
-  box-shadow: 0 10px 20px rgba(255, 138, 181, 0.12);
+  background: var(--accent-glow);
+  color: var(--text-primary);
 }
 
 .todo-category-tab.active .todo-category-tab-meta {
@@ -3242,21 +3238,19 @@ body[data-theme="cute"] .attachment-rail-option:hover {
   align-items: flex-start;
   gap: 14px;
   padding: 15px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.03));
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .todo-item:hover {
-  transform: translateY(-1px);
-  border-color: rgba(255, 179, 208, 0.24);
+  border-color: var(--primary);
 }
 
 .todo-item.completed {
-  background: linear-gradient(135deg, rgba(255, 138, 181, 0.14), rgba(37, 211, 102, 0.13));
-  border-color: rgba(255, 179, 208, 0.28);
-  box-shadow: 0 10px 25px rgba(255, 138, 181, 0.08);
+  background: var(--accent-glow);
+  border-color: var(--accent-glow);
 }
 
 .todo-checkbox {
@@ -3701,7 +3695,7 @@ body[data-theme="cute"] .attachment-rail-option:hover {
   cursor: pointer;
 }
 
-.view-once-toggle .material-icons {
+.view-once-toggle .material-symbols-outlined {
   font-size: 20px;
   color: var(--primary);
 }
@@ -3988,7 +3982,7 @@ body[data-theme="cute"] .attachment-rail-option:hover {
   background: var(--hover);
 }
 
-.msg-context-option .material-icons {
+.msg-context-option .material-symbols-outlined {
   font-size: 18px;
   color: var(--primary);
 }
@@ -4326,7 +4320,7 @@ body[data-theme="cute"] .attachment-rail-option:hover {
 }
 
 .jump-banner-back:hover { opacity: 0.85; }
-.jump-banner-back .material-icons { font-size: 15px; }
+.jump-banner-back .material-symbols-outlined { font-size: 15px; }
 
 /* ============================================================================
    LOAD MORE SPINNER
@@ -4512,7 +4506,7 @@ body[data-theme="classic"] .checklist-popup-msg   { color: #8696a0; }
   transition: opacity 0.15s, transform 0.15s;
 }
 .checklist-popup-open:hover { opacity: 0.9; transform: translateY(-1px); }
-.checklist-popup-open .material-icons { font-size: 16px; }
+.checklist-popup-open .material-symbols-outlined { font-size: 16px; }
 
 .checklist-popup-ok {
   display: flex;
@@ -4541,15 +4535,13 @@ body[data-theme="cute"] .checklist-popup-ok:hover {
   background: rgba(180,60,100,0.06);
   color: var(--primary);
 }
-.checklist-popup-ok .material-icons { font-size: 15px; }
+.checklist-popup-ok .material-symbols-outlined { font-size: 15px; }
 
 
 /* ============================================================================
    MENU MUTE TOGGLE — MUTED STATE INDICATOR
    ============================================================================ */
 .header-tool-item.tool-muted .header-tool-bubble {
-  background: rgba(150, 150, 150, 0.1);
-  border-color: rgba(150, 150, 150, 0.2);
   color: var(--text-secondary);
 }
 .header-tool-item.tool-muted .header-tool-label {

@@ -356,7 +356,7 @@ function renderTodoTemplateEditor(list) {
                     : TODO_CATEGORY_CONFIG[category].description}</p>
             </div>
             <button type="button" class="todo-mini-btn todo-mini-btn-accent" onclick="addTodoTemplateItemFromForm('${category}')">
-                <span class="material-icons">add</span>
+                <span class="material-symbols-outlined">add</span>
                 Create task
             </button>
         </div>
@@ -422,13 +422,13 @@ function renderTodoTemplateEditor(list) {
                 </div>
                 <div class="todo-editor-item-actions">
                     <button type="button" class="todo-mini-btn icon-only" ${isFirstItem ? "disabled" : ""} onclick="moveTodoTemplateItem('${item.id}', 'up')" title="Move up">
-                        <span class="material-icons">keyboard_arrow_up</span>
+                        <span class="material-symbols-outlined">keyboard_arrow_up</span>
                     </button>
                     <button type="button" class="todo-mini-btn icon-only" ${isLastItem ? "disabled" : ""} onclick="moveTodoTemplateItem('${item.id}', 'down')" title="Move down">
-                        <span class="material-icons">keyboard_arrow_down</span>
+                        <span class="material-symbols-outlined">keyboard_arrow_down</span>
                     </button>
                     <button type="button" class="todo-mini-btn icon-only" onclick="removeTodoTemplateItem('${item.id}')" title="Delete task">
-                        <span class="material-icons">delete</span>
+                        <span class="material-symbols-outlined">delete</span>
                     </button>
                 </div>
             </div>
@@ -570,7 +570,7 @@ function renderTodoModal() {
             row.innerHTML = `
                 <label class="todo-checkbox">
                     <input type="checkbox" ${progress.done ? "checked" : ""} ${canToggle ? "" : "disabled"} onchange="toggleTodoItem('${item.id}')">
-                    <span><span class="material-icons">check</span></span>
+                    <span><span class="material-symbols-outlined">check</span></span>
                 </label>
                 <div class="todo-item-content">
                     <strong>${escapeHtml(item.emoji || "💕")} ${escapeHtml(item.text)}</strong>

@@ -1,7 +1,7 @@
 // Service worker — enables PWA install prompt on Android Chrome
 // Stale-while-revalidate for app files: cached response served instantly,
 // then refreshed from the network in the background for the next load.
-const CACHE = 'our-room-v10';
+const CACHE = 'our-room-v11';
 const STATIC = [
     '/', '/index.html', '/style.css', '/manifest.json', '/icon.svg',
     '/js/config.js', '/js/auth.js', '/js/utils.js', '/js/chat-core.js', '/js/render.js',

@@ -507,7 +507,7 @@ function resetVoiceComposerUI() {
     document.getElementById("voice-preview-slider").max = "0";
     document.getElementById("voice-preview-current").textContent = "0:00";
     document.getElementById("voice-preview-total").textContent = "0:00";
-    document.getElementById("voice-preview-play").innerHTML = '<span class="material-icons">play_arrow</span>';
+    document.getElementById("voice-preview-play").innerHTML = '<span class="material-symbols-outlined">play_arrow</span>';
     updateVoiceComposerUI("recording");
 }
 
@@ -534,11 +534,11 @@ function setupVoicePreviewAudio(blob) {
     };
 
     audio.onended = () => {
-        playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+        playBtn.innerHTML = '<span class="material-symbols-outlined">play_arrow</span>';
     };
 
     audio.onpause = () => {
-        playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+        playBtn.innerHTML = '<span class="material-symbols-outlined">play_arrow</span>';
     };
 }
 
@@ -583,10 +583,10 @@ window.toggleVoicePreviewPlayback = async function () {
 
     if (audio.paused) {
         await audio.play();
-        playBtn.innerHTML = '<span class="material-icons">pause</span>';
+        playBtn.innerHTML = '<span class="material-symbols-outlined">pause</span>';
     } else {
         audio.pause();
-        playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+        playBtn.innerHTML = '<span class="material-symbols-outlined">play_arrow</span>';
     }
 };
 

@@ -291,7 +291,7 @@ function openMessageContextMenu(messageId, anchor) {
 
     const reactBtn = document.createElement("button");
     reactBtn.className = "msg-context-option";
-    reactBtn.innerHTML = '<span class="material-icons">add_reaction</span>React';
+    reactBtn.innerHTML = '<span class="material-symbols-outlined">add_reaction</span>React';
     reactBtn.onclick = (e) => {
         e.stopPropagation();
         closeMessageContextMenu();
@@ -303,7 +303,7 @@ function openMessageContextMenu(messageId, anchor) {
     if (messageType === "text" && message.text) {
         const copyBtn = document.createElement("button");
         copyBtn.className = "msg-context-option";
-        copyBtn.innerHTML = '<span class="material-icons">content_copy</span>Copy';
+        copyBtn.innerHTML = '<span class="material-symbols-outlined">content_copy</span>Copy';
         copyBtn.onclick = (e) => {
             e.stopPropagation();
             closeMessageContextMenu();
@@ -687,7 +687,7 @@ function renderMessage(message, prepend = false, containerEl = null) {
         const replyBtn = document.createElement("button");
         replyBtn.className = "msg-reply-btn";
         replyBtn.title = "Reply";
-        replyBtn.innerHTML = '<span class="material-icons">reply</span>';
+        replyBtn.innerHTML = '<span class="material-symbols-outlined">reply</span>';
         replyBtn.onclick = (e) => { e.stopPropagation(); setReply(message.id); };
         bubble.appendChild(replyBtn);
 
@@ -764,7 +764,7 @@ function renderTextContent(bubble, message) {
 
         card.innerHTML = `
       <div class="link-preview-title">
-        <span class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">language</span>
+        <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;margin-right:4px">language</span>
         ${escapeHtml(domain)}
       </div>
       <div class="link-preview-url">${escapeHtml(displayUrl)}</div>
@@ -805,7 +805,7 @@ function renderImageContent(bubble, message, isSender) {
         if (viewOnce && !isSender && !hasViewed) {
             const overlay = document.createElement("div");
             overlay.className = "view-once-overlay";
-            overlay.innerHTML = '<span class="material-icons" style="font-size:14px">lock</span> View once';
+            overlay.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px">lock</span> View once';
             container.appendChild(overlay);
         }
     }
@@ -841,18 +841,18 @@ function renderVideoContent(bubble, message, isSender) {
     } else {
         container.style.cssText = "position:relative;width:200px;height:150px;background:#1e293b;border-radius:8px;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center;";
         container.innerHTML = `
-        <span class="material-icons" style="font-size:40px;color:var(--text-secondary)">video_file</span>
+        <span class="material-symbols-outlined" style="font-size:40px;color:var(--text-secondary)">video_file</span>
         <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
           width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,0.65);
           display:flex;align-items:center;justify-content:center;">
-          <span class="material-icons" style="color:white;font-size:28px">play_arrow</span>
+          <span class="material-symbols-outlined" style="color:white;font-size:28px">play_arrow</span>
         </div>
       `;
 
         if (viewOnce && !isSender && !hasViewed) {
             const overlay = document.createElement("div");
             overlay.className = "view-once-overlay";
-            overlay.innerHTML = '<span class="material-icons" style="font-size:14px">lock</span> View once';
+            overlay.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px">lock</span> View once';
             container.appendChild(overlay);
         }
 
@@ -869,7 +869,7 @@ function renderVoiceContent(bubble, message) {
 
     const playBtn = document.createElement("button");
     playBtn.className = "voice-play-btn";
-    playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+    playBtn.innerHTML = '<span class="material-symbols-outlined">play_arrow</span>';
 
     const waveform = document.createElement("div");
     waveform.className = "voice-waveform";
@@ -912,7 +912,7 @@ function renderVoiceContent(bubble, message) {
 
             audio.onended = () => {
                 isPlaying = false;
-                playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+                playBtn.innerHTML = '<span class="material-symbols-outlined">play_arrow</span>';
                 progress.style.width = "0%";
                 seekbar.value = "0";
                 durationEl.textContent = message.voice_duration || "0:00";
@@ -920,7 +920,7 @@ function renderVoiceContent(bubble, message) {
 
             audio.onpause = () => {
                 isPlaying = false;
-                playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+                playBtn.innerHTML = '<span class="material-symbols-outlined">play_arrow</span>';
             };
         }
         return audio;
@@ -933,11 +933,11 @@ function renderVoiceContent(bubble, message) {
         if (isPlaying) {
             readyAudio.pause();
             isPlaying = false;
-            playBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+            playBtn.innerHTML = '<span class="material-symbols-outlined">play_arrow</span>';
         } else {
             await readyAudio.play();
             isPlaying = true;
-            playBtn.innerHTML = '<span class="material-icons">pause</span>';
+            playBtn.innerHTML = '<span class="material-symbols-outlined">pause</span>';
         }
     };
 
