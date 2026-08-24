@@ -7,13 +7,9 @@ const CONFIG = {
         url: "https://twvwusthqhxnmghcnbjk.supabase.co",
         key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3dnd1c3RocWh4bm1naGNuYmprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMzUwMTAsImV4cCI6MjA4MTkxMTAxMH0.zPw0OH5TaWCM_SLGQYpUAp00mVZwamR13KPDs_HRb7s"
     },
-    telegram: {
-        botToken: "8551799267:AAF3DHlffeUhTCWYV5J5c0AoYRbDmfNkodo",
-        chatId: "5637769598"
-    },
     pagination: {
         initialLoad: 200,
-        pageSize: 1000
+        pageSize: 150
     },
     vapid: {
         publicKey: "BDNr_hcau1wH8wi6hT5L98_J0Vguop-8oi7x0vVQSGyRH96_kiAePm6rYiBmLY6zHEUQHcA1Q2LkAlSp9ptiB8g"
@@ -1626,13 +1622,19 @@ function setupScrollHandler() {
     const messagesDiv = document.getElementById("messages");
     const jumpBtn = document.getElementById("jump-bottom-btn");
 
+    let ticking = false;
     messagesDiv.addEventListener("scroll", () => {
-        const atBottom = messagesDiv.scrollHeight - messagesDiv.scrollTop <= messagesDiv.clientHeight + 50;
-        state.isAtBottom = atBottom;
-        if (jumpBtn) jumpBtn.style.display = atBottom ? "none" : "flex";
-        if (atBottom) markVisibleMessagesAsRead();
-        updateFloatingDate();
-    });
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+            const atBottom = messagesDiv.scrollHeight - messagesDiv.scrollTop <= messagesDiv.clientHeight + 50;
+            state.isAtBottom = atBottom;
+            if (jumpBtn) jumpBtn.style.display = atBottom ? "none" : "flex";
+            if (atBottom) markVisibleMessagesAsRead();
+            updateFloatingDate();
+            ticking = false;
+        });
+    }, { passive: true });
 }
 
 // ============================================================================
@@ -1670,6 +1672,8 @@ async function setupRealtimeSubscription() {
                     message.message_type === "video" ? "🎥 Video" :
                         message.message_type === "voice" ? "🎤 Voice message" :
                             (message.text || "Message");
+
+            announceForScreenReader(`${USER_NAMES[message.sender] || "New message"}: ${preview}`);
 
             // Web Push handles this notification — no need to also call showNotification
         }
@@ -2753,6 +2757,7 @@ function renderImageContent(bubble, message, isSender) {
         img.alt = "Image";
         img.loading = "lazy";
         img.style.cursor = "pointer";
+        img.onload = () => img.classList.add("media-loaded");
 
         getSignedUrl("chat-images", message.image_url).then(url => { if (url) img.src = url; });
         img.onclick = () => openImageViewer(message.id, message.image_url, viewOnce, viewedBy, message.sender);
@@ -3035,16 +3040,10 @@ async function showNotification(title, body) {
     new Notification(title, { body });
 }
 
-async function sendTelegramNotification(title, body) {
+async function sendTelegramNotification(title, body = "") {
     if (localStorage.getItem(TELEGRAM_MUTED_KEY) === "true") return;
     try {
-        const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        const text = `<b>${esc(title)}</b>\n${esc(body)}`;
-        await fetch(`https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendMessage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chat_id: CONFIG.telegram.chatId, text, parse_mode: "HTML" })
-        });
+        await state.supabaseClient.functions.invoke("send-telegram", { body: { title, body } });
     } catch (err) { console.error("Telegram:", err); }
 }
 
@@ -3249,7 +3248,34 @@ function updateConnectionStatus(status) {
     }
 }
 
-function showAlert(message) { alert(message); }
+function announceForScreenReader(text) {
+    const region = document.getElementById("sr-live-region");
+    if (!region) return;
+    region.textContent = "";
+    // Re-set on the next frame so repeated identical messages still trigger an announcement.
+    requestAnimationFrame(() => { region.textContent = text; });
+}
+
+function showAlert(message) {
+    let container = document.getElementById("toast-container");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toast-container";
+        container.setAttribute("role", "alert");
+        container.setAttribute("aria-live", "assertive");
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add("toast-visible"));
+    setTimeout(() => {
+        toast.classList.remove("toast-visible");
+        toast.addEventListener("transitionend", () => toast.remove(), { once: true });
+        setTimeout(() => toast.remove(), 400);
+    }, 3500);
+}
 
 function formatTime(timestamp) {
     return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });

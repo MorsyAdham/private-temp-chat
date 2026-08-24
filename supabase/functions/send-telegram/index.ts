@@ -1,19 +1,20 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import webpush from "npm:web-push";
 
 const CORS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY")!;
-const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
+const TELEGRAM_CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID")!;
 const ALLOWED_EMAILS = ["adhammorsy2311@gmail.com", "ayaessam487@gmail.com", "joboffers540@gmail.com"];
 
-webpush.setVapidDetails("mailto:adhammorsy2311@gmail.com", VAPID_PUBLIC, VAPID_PRIVATE);
+function escapeHtml(s: string) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
 serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -37,53 +38,33 @@ serve(async (req) => {
             });
         }
 
-        const { to_email, title, body } = await req.json();
-        if (!to_email || !title || !ALLOWED_EMAILS.includes(to_email)) {
-            return new Response(JSON.stringify({ error: "Missing or invalid fields" }), {
+        const { title, body } = await req.json();
+        if (!title) {
+            return new Response(JSON.stringify({ error: "Missing fields" }), {
                 status: 400, headers: { ...CORS, "Content-Type": "application/json" }
             });
         }
 
-        const { data, error } = await db
-            .from("push_subscriptions")
-            .select("endpoint, subscription")
-            .eq("user_email", to_email);
+        const text = body ? `<b>${escapeHtml(String(title))}</b>\n${escapeHtml(String(body))}` : escapeHtml(String(title));
 
-        if (error || !data?.length) {
-            return new Response(JSON.stringify({ error: "No subscriptions found" }), {
-                status: 404, headers: { ...CORS, "Content-Type": "application/json" }
+        const tgResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: "HTML" })
+        });
+
+        if (!tgResponse.ok) {
+            const errText = await tgResponse.text();
+            return new Response(JSON.stringify({ error: `Telegram error: ${errText}` }), {
+                status: 502, headers: { ...CORS, "Content-Type": "application/json" }
             });
         }
 
-        // Send to all devices, clean up expired subscriptions
-        const staleEndpoints: string[] = [];
-        await Promise.allSettled(
-            data.map(async (row) => {
-                let sub = row.subscription;
-                while (typeof sub === "string") sub = JSON.parse(sub);
-                try {
-                    await webpush.sendNotification(sub, JSON.stringify({ title, body }));
-                } catch (err: any) {
-                    if (err.statusCode === 404 || err.statusCode === 410) {
-                        staleEndpoints.push(row.endpoint);
-                    }
-                }
-            })
-        );
-
-        // Remove stale subscriptions
-        if (staleEndpoints.length > 0) {
-            await db.from("push_subscriptions")
-                .delete()
-                .eq("user_email", to_email)
-                .in("endpoint", staleEndpoints);
-        }
-
-        return new Response(JSON.stringify({ ok: true, sent: data.length - staleEndpoints.length }), {
+        return new Response(JSON.stringify({ ok: true }), {
             headers: { ...CORS, "Content-Type": "application/json" }
         });
     } catch (err) {
-        console.error("send-push error:", err);
+        console.error("send-telegram error:", err);
         return new Response(JSON.stringify({ error: String(err) }), {
             status: 500, headers: { ...CORS, "Content-Type": "application/json" }
         });

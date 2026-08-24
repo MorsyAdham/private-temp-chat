@@ -21,7 +21,7 @@
     <!-- Inline favicon -->
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💕</text></svg>">
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2.112.3"></script>
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script>
@@ -319,8 +319,13 @@
                 </button>
             </div>
 
+            <!-- Screen-reader announcements for new incoming messages (kept separate from the
+                 message list itself, which is not live, so screen readers don't re-announce
+                 the whole history on load or on every scroll-triggered page-in). -->
+            <div id="sr-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
             <!-- Messages Container -->
-            <div id="messages" class="messages-container">
+            <div id="messages" class="messages-container" role="log" aria-label="Chat messages">
                 <div id="load-more-spinner" class="load-more-spinner" style="display:none;">
                     <span class="material-icons spin-icon">autorenew</span>
                 </div>
