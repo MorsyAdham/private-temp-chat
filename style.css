@@ -610,6 +610,7 @@ body.app-view-enabled .container {
 .chat-elephant.login-wave .el-ear-l { animation: el-ear-login    0.8s ease-in-out infinite; }
 .chat-elephant.login-wave .el-ear-r { animation: el-ear-login    0.8s ease-in-out infinite 0.4s; }
 .chat-elephant.login-wave .el-tail  { animation: el-tail-wag     0.55s ease-in-out infinite; }
+.chat-elephant.login-wave .el-arm-r { animation: el-wave         1.1s ease-in-out infinite; }
 .chat-elephant.login-wave .el-lid-l { animation: el-blink        5s ease-in-out infinite; }
 .chat-elephant.login-wave .el-lid-r { animation: el-blink        5s ease-in-out infinite 0.1s; }
 
@@ -1013,6 +1014,48 @@ body.menu-sheet-open {
   transform: translateX(17px);
 }
 
+/* ============================================================================
+   SHARED TACTILE PRESS FEEDBACK
+   One consistent "clean" press effect across every button-like control, so
+   taps feel immediate and consistent instead of only reacting to :hover
+   (which doesn't fire on touch). Kept as a single fast scale-down.
+   ============================================================================ */
+.header-bubble-btn,
+.header-mini-stat,
+.header-tool-item,
+.menu-inline-btn,
+.notif-test-btn,
+.toggle-switch,
+.attachment-rail-option,
+.attachment-dock > #attach-btn,
+.input-area > .icon-btn,
+.input-area > #send-btn,
+.input-area > #voice-btn,
+.todo-category-tab,
+.todo-weekday-tab,
+.todo-item,
+.icon-btn-small {
+  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+}
+
+.header-bubble-btn:active,
+.header-mini-stat:active,
+.header-tool-item:active,
+.menu-inline-btn:active,
+.notif-test-btn:active,
+.toggle-switch:active,
+.attachment-rail-option:active,
+.attachment-dock > #attach-btn:active,
+.input-area > .icon-btn:active,
+.input-area > #send-btn:active,
+.input-area > #voice-btn:active,
+.todo-category-tab:active,
+.todo-weekday-tab:active,
+.todo-item:active,
+.icon-btn-small:active {
+  transform: scale(0.94);
+}
+
 /* Logout button in header */
 .logout-btn {
   color: var(--primary);
@@ -1151,9 +1194,9 @@ body.menu-sheet-open {
   gap: 7px;
   min-width: 0;
   height: 44px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 16px;
+  border-radius: 999px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
     rgba(18, 11, 22, 0.22);
@@ -1611,6 +1654,12 @@ body[data-theme="classic"] .jump-date-input {
 /* ============================================================================
    MESSAGES CONTAINER
    ============================================================================ */
+/* Playful doodle texture behind the messages — hearts, a star, a paw print, a swoosh.
+   Plain multi-layer background-image (not a mask) so it's guaranteed to paint behind
+   message bubbles and doesn't depend on CSS mask support. Opacity is baked into the
+   SVG itself (stroke-opacity) since a data-URI can't read CSS custom properties, so
+   there's a light-stroke variant for dark themes and a dark-stroke variant for light
+   ones (swapped in below via the theme selectors). */
 .messages-container {
   flex: 1;
   overflow-y: auto;
@@ -1619,29 +1668,15 @@ body[data-theme="classic"] .jump-date-input {
   flex-direction: column;
   gap: 8px;
   position: relative;
-  background: var(--chat-bg);
-  z-index: 0;
+  background:
+    url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'><g fill='none' stroke='%23ffffff' stroke-opacity='0.16' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'><path transform='translate(20,30) scale(0.7)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(150,150) scale(0.55)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(170,20)' d='M12 0l3 8 8 1-6 6 1 8-9-5-9 5 1-8-6-6 8-1z'/><g transform='translate(90,150)'><ellipse cx='0' cy='10' rx='11' ry='8'/><circle cx='-11' cy='-6' r='4'/><circle cx='0' cy='-10' r='4'/><circle cx='11' cy='-6' r='4'/></g><path d='M150 200q10-12 20 0'/><path d='M40 180l6 6M46 180l-6 6'/><circle cx='200' cy='90' r='3'/><circle cx='30' cy='110' r='3'/><circle cx='110' cy='30' r='3'/></g></svg>") repeat,
+    var(--chat-bg);
+  background-size: 220px 220px, auto;
 }
 
-/* Playful doodle texture behind the messages — hearts, a star, a paw print, a swoosh.
-   Uses a CSS mask so the doodle automatically tints to each theme's --text-secondary,
-   instead of needing a separate hardcoded SVG per theme. */
-.messages-container::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0.07;
-  background-color: var(--text-secondary);
-  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'><g fill='none' stroke='%23000' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'><path transform='translate(20,30) scale(0.7)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(150,150) scale(0.55)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(170,20)' d='M12 0l3 8 8 1-6 6 1 8-9-5-9 5 1-8-6-6 8-1z'/><g transform='translate(90,150)'><ellipse cx='0' cy='10' rx='11' ry='8'/><circle cx='-11' cy='-6' r='4'/><circle cx='0' cy='-10' r='4'/><circle cx='11' cy='-6' r='4'/></g><path d='M150 200q10-12 20 0'/><path d='M40 180l6 6M46 180l-6 6'/><circle cx='200' cy='90' r='3'/><circle cx='30' cy='110' r='3'/><circle cx='110' cy='30' r='3'/></g></svg>");
-  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'><g fill='none' stroke='%23000' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'><path transform='translate(20,30) scale(0.7)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(150,150) scale(0.55)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(170,20)' d='M12 0l3 8 8 1-6 6 1 8-9-5-9 5 1-8-6-6 8-1z'/><g transform='translate(90,150)'><ellipse cx='0' cy='10' rx='11' ry='8'/><circle cx='-11' cy='-6' r='4'/><circle cx='0' cy='-10' r='4'/><circle cx='11' cy='-6' r='4'/></g><path d='M150 200q10-12 20 0'/><path d='M40 180l6 6M46 180l-6 6'/><circle cx='200' cy='90' r='3'/><circle cx='30' cy='110' r='3'/><circle cx='110' cy='30' r='3'/></g></svg>");
-  -webkit-mask-repeat: repeat;
-  mask-repeat: repeat;
-  -webkit-mask-size: 220px 220px;
-  mask-size: 220px 220px;
-  -webkit-mask-mode: alpha;
-  mask-mode: alpha;
+body[data-theme="cute"] .messages-container {
+  background-image:
+    url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'><g fill='none' stroke='%23000000' stroke-opacity='0.07' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'><path transform='translate(20,30) scale(0.7)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(150,150) scale(0.55)' d='M20,10 A10,10 0 0,1 40,10 A10,10 0 0,1 60,10 Q60,35 40,50 Q20,35 20,10 Z'/><path transform='translate(170,20)' d='M12 0l3 8 8 1-6 6 1 8-9-5-9 5 1-8-6-6 8-1z'/><g transform='translate(90,150)'><ellipse cx='0' cy='10' rx='11' ry='8'/><circle cx='-11' cy='-6' r='4'/><circle cx='0' cy='-10' r='4'/><circle cx='11' cy='-6' r='4'/></g><path d='M150 200q10-12 20 0'/><path d='M40 180l6 6M46 180l-6 6'/><circle cx='200' cy='90' r='3'/><circle cx='30' cy='110' r='3'/><circle cx='110' cy='30' r='3'/></g></svg>");
 }
 
 body.app-view-enabled .messages-container {
@@ -4022,7 +4057,17 @@ body[data-theme="cute"] .attachment-rail-option:hover {
 .el-ear-r { transform-box: fill-box; transform-origin: left center; }
 .el-trunk { transform-box: fill-box; transform-origin: top center; }
 .el-tail  { transform-box: fill-box; transform-origin: left center; }
+.el-arm-l { transform-box: fill-box; transform-origin: 100% 0%; }
+.el-arm-r { transform-box: fill-box; transform-origin: 0% 100%; }
 .el-stars { opacity: 0; transform-box: fill-box; transform-origin: center; }
+
+@keyframes el-wave {
+  0%, 100% { transform: rotate(0deg); }
+  20%      { transform: rotate(-20deg); }
+  40%      { transform: rotate(16deg); }
+  60%      { transform: rotate(-16deg); }
+  80%      { transform: rotate(12deg); }
+}
 
 .el-lid-l, .el-lid-r {
   transform-box: fill-box;
@@ -4102,7 +4147,13 @@ body[data-theme="cute"] .attachment-rail-option:hover {
 /* ---- HAPPY ---- */
 .chat-elephant.happy .el-char  { animation: el-happy-bounce 0.55s ease-in-out 3; }
 .chat-elephant.happy .el-trunk { animation: el-trunk-happy 0.55s ease-in-out infinite; }
+.chat-elephant.happy .el-arm-r { animation: el-wave 0.55s ease-in-out infinite; }
 .chat-elephant.happy .el-stars { animation: el-stars-pop 1.65s ease-out forwards; }
+
+/* ---- WAVING (tap-triggered "hi!" gesture) ---- */
+.chat-elephant.waving .el-char  { animation: el-happy-bounce 0.9s ease-in-out 2; }
+.chat-elephant.waving .el-arm-r { animation: el-wave 0.75s ease-in-out 3; }
+.chat-elephant.waving .el-tail  { animation: el-tail-wag 0.5s ease-in-out infinite; }
 
 @keyframes el-happy-bounce {
   0%, 100% { transform: translateY(0) scale(1); }

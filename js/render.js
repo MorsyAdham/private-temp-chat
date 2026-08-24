@@ -122,7 +122,7 @@ function elephantOnPeerTyping(active) {
 }
 
 // ---- INTERACTIVE TAPS ----
-const ELEPHANT_FUN_STATES = ["surprised", "playful", "shy", "winking", "dancing", "love", "playful", "surprised"];
+const ELEPHANT_FUN_STATES = ["surprised", "playful", "shy", "winking", "waving", "dancing", "love", "playful", "surprised"];
 let elephantFunIndex = 0;
 let elephantTapCount = 0;
 let elephantTapResetTimer = null;
@@ -205,13 +205,14 @@ function elephantHandleTap() {
                 playful: "Wheee! 🎊",
                 shy: "Heehee… 🙈",
                 winking: "😉 psst!",
+                waving: "Hi there! 👋",
                 dancing: "Let's dance! 💃",
                 love: "Love you! 💕"
             };
             if (speeches[next]) showElephantBubble(speeches[next]);
-            const duration = next === "winking" ? 2200 : next === "shy" ? 2000 : 1800;
+            const duration = next === "winking" ? 2200 : next === "shy" ? 2000 : next === "waving" ? 2100 : 1800;
             elephantInteractionTimer = setTimeout(() => {
-                if (["surprised","playful","shy","winking","angry","tickled","dancing","love"].includes(elephantCurrentState)) {
+                if (["surprised","playful","shy","winking","waving","angry","tickled","dancing","love"].includes(elephantCurrentState)) {
                     setElephantState(["typing","thinking","waiting"].includes(prevChatState) ? prevChatState : "idle");
                 }
             }, duration);
