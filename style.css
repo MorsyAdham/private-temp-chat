@@ -872,6 +872,9 @@ input:focus { border-color: var(--primary); }
 
 .header-tools {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .header-tools-backdrop {

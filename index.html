@@ -170,6 +170,9 @@
                         <strong id="header-streak-text">0</strong>
                     </button>
                     <div class="header-tools">
+                        <button id="header-reload-btn" class="icon-btn header-bubble-btn" onclick="reloadChat()" title="Reload Chat">
+                            <span class="material-symbols-outlined">refresh</span>
+                        </button>
                         <button id="tools-toggle-btn" class="icon-btn header-bubble-btn" onclick="toggleHeaderTools(event)" title="Menu" aria-haspopup="true" aria-expanded="false">
                             <span class="material-symbols-outlined">menu</span>
                         </button>
@@ -199,11 +202,6 @@
                         <input type="date" id="jump-date-input" class="jump-date-input menu-inline-input"
                                onchange="jumpToDateFromMenu(this.value)" title="Pick a date">
                     </div>
-
-                    <button type="button" class="header-tool-item" onclick="reloadChat()">
-                        <span class="material-symbols-outlined header-tool-bubble">refresh</span>
-                        <span class="header-tool-label">Reload Chat</span>
-                    </button>
 
                     <div class="header-tool-divider"></div>
 
